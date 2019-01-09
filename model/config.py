@@ -15,7 +15,7 @@ class Config(object):
     shuffle_train = True
     shuffle_val = True
 
-    load_public_weight = False
+    load_public_weight = True
     weight_load_path = r'checkpoints/crossentropy_vgg.pth'
     weight_save_path = r'checkpoints/ordinal_vgg.pth'
     log_root = r'logs'

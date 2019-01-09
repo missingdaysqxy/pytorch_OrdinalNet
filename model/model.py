@@ -24,7 +24,7 @@ class OrdinalNet(nn.Module):
         self.logits = nn.Linear(1000, num_classes)
 
     def forward(self, input):
-        out = F.relu(self.vggnet(input))
+        out = F.softmax(self.vggnet(input))
         out = self.logits(out)
         return out
 

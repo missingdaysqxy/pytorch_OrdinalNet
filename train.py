@@ -8,6 +8,7 @@
 import os
 import warnings
 import torch as t
+import numpy as np
 from torch.autograd import Variable as V
 from torch.nn import Module
 from visdom import Visdom
@@ -94,7 +95,6 @@ def train(model, train_data, val_data, config, visdom):
     # init meter statistics
     loss_meter = meter.AverageValueMeter()
     confusion_matrix = meter.ConfusionMeter(config.num_classes)
-    eye_mask = t.eye(config.num_classes).to(t.uint8)
     with open(config.result_file, 'a') as file:
         for epoch in range(lastepoch + 1, config.max_epoch):
             scheduler.step(epoch)
@@ -125,7 +125,7 @@ def train(model, train_data, val_data, config, visdom):
                     step = epoch * len(train_data) + i
                     loss_mean = loss_meter.value()[0]
                     cm_value = confusion_matrix.value()
-                    num_correct = t.from_numpy(cm_value).masked_select(eye_mask).sum().to(t.float)
+                    num_correct = cm_value.trace().astype(np.float)
                     accuracy = 100 * num_correct / cm_value.sum()
                     plot(loss_mean, step, visdom, 'loss:' + config.loss_type)
                     plot(accuracy, step, visdom, 'train_accuracy')
@@ -150,7 +150,6 @@ def val(model, val_data, config, visdom):
     # type: (Module,CloudDataLoader,CloudDataLoader,Config,Visdom)->[float,meter.ConfusionMeter]
     model.eval()
     confusion_matrix = meter.ConfusionMeter(config.num_classes)
-    eye_mask = t.eye(config.num_classes).to(t.uint8)
     for i, input in enumerate(val_data):
         # input data
         batch_img, batch_label, batch_parent = input
@@ -163,12 +162,15 @@ def val(model, val_data, config, visdom):
         batch_probs = model(batch_img)
         confusion_matrix.add(batch_probs.data.squeeze(), batch_label.data.long())
         if i % config.ckpt_freq == config.ckpt_freq - 1:
-            msg = "[Validation]process:{}/{}, confusion matrix:\n{}".format(
+            msg = "[Validation]process:{}/{}, acuuracy:{}, confusion matrix:\n{}".format(
                 i, len(val_data), confusion_matrix.value())
             log_process(i, len(val_data), msg, visdom, 'val_log', append=True)
     cm_value = confusion_matrix.value()
-    num_correct = t.from_numpy(cm_value).masked_select(eye_mask).sum().to(t.float)
+    num_correct = cm_value.trace().astype(np.float)
     accuracy = 100 * num_correct / cm_value.sum()
+    msg = "[Validation]process:{}/{}, acuuracy:{}, confusion matrix:\n{}".format(
+        i, len(val_data), accuracy, confusion_matrix.value())
+    log_process(len(val_data), len(val_data), msg, visdom, 'val_log', append=True)
     return accuracy, confusion_matrix
 
 
