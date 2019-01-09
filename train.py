@@ -7,8 +7,8 @@
 
 import os
 import warnings
-import torch as t
 import numpy as np
+import torch as t
 from torch.autograd import Variable as V
 from torch.nn import Module
 from visdom import Visdom
@@ -42,8 +42,7 @@ def get_data(data_path, config: Config, shuffle):
 
 def get_loss_function(config: Config) -> Module:
     if config.loss_type == "ordinal":
-        return t.nn.CrossEntropyLoss()
-        # return OrdinalLoss()
+        return OrdinalLoss()
     elif config.loss_type in ["cross_entropy", "crossentropy", "cross", "ce"]:
         return t.nn.CrossEntropyLoss()
     else:
@@ -162,15 +161,12 @@ def val(model, val_data, config, visdom):
         batch_probs = model(batch_img)
         confusion_matrix.add(batch_probs.data.squeeze(), batch_label.data.long())
         if i % config.ckpt_freq == config.ckpt_freq - 1:
-            msg = "[Validation]process:{}/{}, acuuracy:{}, confusion matrix:\n{}".format(
+            msg = "[Validation]process:{}/{}, confusion matrix:\n{}".format(
                 i, len(val_data), confusion_matrix.value())
             log_process(i, len(val_data), msg, visdom, 'val_log', append=True)
     cm_value = confusion_matrix.value()
     num_correct = cm_value.trace().astype(np.float)
     accuracy = 100 * num_correct / cm_value.sum()
-    msg = "[Validation]process:{}/{}, acuuracy:{}, confusion matrix:\n{}".format(
-        i, len(val_data), accuracy, confusion_matrix.value())
-    log_process(len(val_data), len(val_data), msg, visdom, 'val_log', append=True)
     return accuracy, confusion_matrix
 
 
@@ -182,6 +178,8 @@ def main(args):
     model = get_model(config)
     try:
         vis = Visdom(env=config.visdom_env)
+        if not vis.check_connection():
+            raise ConnectionError("Can't connect to visdom server, please run command 'python -m visdom.server'")
     except:
         warnings.warn("Can't open Visdom!")
     print("Prepare to train model...")

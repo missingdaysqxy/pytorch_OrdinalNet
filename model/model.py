@@ -12,19 +12,18 @@ from torch.nn import functional as F
 import math
 
 
-
 class OrdinalNet(nn.Module):
     def __init__(self, num_classes, batch_norm=True, pretrained=False):
         super(OrdinalNet, self).__init__()
         if batch_norm:
-            self.vggnet = vgg.vgg11_bn(pretrained)
+            self.vggnet = vgg.vgg19_bn(pretrained)
         else:
-            self.vggnet = vgg.vgg11(pretrained)
+            self.vggnet = vgg.vgg19(pretrained)
         # self.vggnet = MyVGG19(3, 1000, batch_norm)
         self.logits = nn.Linear(1000, num_classes)
 
     def forward(self, input):
-        out = F.softmax(self.vggnet(input))
+        out = F.softmax(self.vggnet(input), dim=0)
         out = self.logits(out)
         return out
 
