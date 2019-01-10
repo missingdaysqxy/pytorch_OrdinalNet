@@ -1,5 +1,5 @@
 # -*- coding: utf-8 -*-
-# @Time    : 2019/1/5/005 20:37 下午
+# @Time    : 2019/1/5 20:37
 # @Author  : LQX
 # @Email   : qixuan.lqx@qq.com
 # @File    : datasets.py
@@ -29,14 +29,14 @@ class CloudDataset(data.Dataset):
                 class_name, data_dir)
         self.img_paths = []
         self.labels = []
-        self.parent_names = []
+        self.scene_names = []
         for i, annotation in enumerate(self.classes_list):
             dir = os.path.join(self.data_dir, annotation)
             fs = os.listdir(dir)
-            parent = [os.path.basename(f).split('_')[0] for f in fs]
+            scene = [os.path.basename(f).split('_')[0] for f in fs]
             fs = [os.path.join(dir, item) for item in fs]
             self.img_paths.extend(fs)
-            self.parent_names.extend(parent)
+            self.scene_names.extend(scene)
             self.labels.extend([i] * len(fs))
         if _isArrayLike(img_resize) or isinstance(img_resize, int):
             self.transform = T.Compose([T.Resize(img_resize), T.ToTensor()])
@@ -46,10 +46,10 @@ class CloudDataset(data.Dataset):
     def __getitem__(self, index):
         path = self.img_paths[index]
         label = self.labels[index]
-        parent_name = self.parent_names[index]
+        scene_name = self.scene_names[index]
         img = Image.open(path)
         img = self.transform(img)
-        return img, label, parent_name
+        return img, label, scene_name
 
     def __len__(self):
         return len(self.img_paths)
@@ -59,7 +59,7 @@ def CloudDataLoader(data_path, classes_list, batch_size, img_resize, shuffle, nu
     # type:(str,list,int,Optional(tuple,list),bool,int)->DataLoader
     dataset = CloudDataset(data_path, classes_list, img_resize)
     assert len(dataset) > batch_size
-    return DataLoader(dataset, batch_size, shuffle, num_workers=num_workers)
+    return DataLoader(dataset, batch_size, shuffle, num_workers=num_workers, drop_last=True)
 
 
 if __name__ == "__main__":
@@ -81,11 +81,11 @@ if __name__ == "__main__":
     dataloader = DataLoader(dataset, config.batch_size, True)
     for i, input in enumerate(dataloader):
         # input data
-        batch_img, batch_label, batch_parent = input
+        batch_img, batch_label, batch_scene = input
         print("\n")
         print("shape of images:", batch_img.shape)
         print("labels:", batch_label)
-        print("parents:", batch_parent)
+        print("scenes:", batch_scene)
         for i in range(config.batch_size):
             imshow(str(batch_label[i].numpy()), batch_img[i].numpy().astype(np.uint8))
             waitKey(1)

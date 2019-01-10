@@ -1,5 +1,5 @@
 # -*- coding: utf-8 -*-
-# @Time    : 2019/1/6/006 15:41 下午
+# @Time    : 2019/1/6 15:41
 # @Author  : LQX
 # @Email   : qixuan.lqx@qq.com
 # @File    : model.py

@@ -1,5 +1,5 @@
 # -*- coding: utf-8 -*-
-# @Time    : 2019/1/8/008 9:06 上午
+# @Time    : 2019/1/8 9:06
 # @Author  : LQX
 # @Email   : qixuan.lqx@qq.com
 # @File    : ordinalloss.py

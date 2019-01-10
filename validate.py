@@ -1,8 +1,8 @@
 # -*- coding: utf-8 -*-
-# @Time    : 2019/1/5/005 18:05 下午
+# @Time    : 2019/1/9 21:19
 # @Author  : LQX
 # @Email   : qixuan.lqx@qq.com
-# @File    : train.py
+# @File    : validate.py
 # @Software: PyCharm
 
 import os
@@ -59,19 +59,18 @@ def get_optimizer(model: Module, config: Config) -> t.optim.Optimizer:
         raise RuntimeError("Invalid value: config.optimizer")
 
 
-def test(model, val_data, config, visdom):
+def validate(model, val_data, config, visdom):
     # type: (Module,CloudDataLoader,CloudDataLoader,Config,Visdom)->None
     # move model to GPU
     if config.use_gpu:
         model = model.cuda()
         model = t.nn.DataParallel(model, config.gpu_list)
-    # evaluate
-    model.eval()
-    parent_dict = defaultdict(list)
+    # validate
+    scene_dict = defaultdict(list)
     confusion_matrix = meter.ConfusionMeter(config.num_classes)
-    for i, input in enumerate(val_data):
+    for i, (batch_img, batch_label, batch_scene) in enumerate(val_data):
+        model.eval()
         # input data
-        batch_img, batch_label, batch_parent = input
         batch_img = V(batch_img)
         batch_label = V(batch_label)
         if config.use_gpu:
@@ -79,26 +78,29 @@ def test(model, val_data, config, visdom):
             batch_label = batch_label.cuda()
         # forward
         batch_probs = model(batch_img)
-        pred = t.argmax(batch_probs,dim=-1)
-        for parent, c in zip(batch_parent, pred == batch_label):
-            parent_dict[parent].append(int(c))
+        preds = t.argmax(batch_probs, dim=-1)
+        compares = (preds == batch_label)
+        if compares.is_cuda:
+            compares = compares.cpu()
+        for scene, c in zip(batch_scene, compares.numpy()):
+            scene_dict[scene].append(int(c))
         confusion_matrix.add(batch_probs.data.squeeze(), batch_label.data.long())
         if i % config.ckpt_freq == 0:
             msg = "[Validation]process:{}/{}, confusion matrix:\n{}".format(
                 i, len(val_data), confusion_matrix.value())
             log_process(i, len(val_data), msg, visdom, 'val_log', append=True)
+        del batch_img, batch_label, batch_scene, batch_probs, preds, compares
+        t.cuda.empty_cache()
+
     cm_value = confusion_matrix.value()
     num_correct = cm_value.trace().astype(np.float)
     accuracy = 100 * num_correct / cm_value.sum()
     # summaries
-    acc_summary = defaultdict(int)
-    for k, v in parent_dict.items():
+    scene_sum = defaultdict(int)  # summary of correct scenes distribution
+    for k, v in scene_dict.items():
         account = np.sum(v)
-        acc_summary[account] += 1
-    # plot(accuracy, 0, visdom, 'test_accuracy')
-    msg = 'test_accuracy:{}\naccuracy summaries:{}\nconfusion matrix:\n{}'.\
-        format(accuracy, acc_summary, confusion_matrix)
-    log(msg, visdom, 'test_result', logfile='test_result.txt')
+        scene_sum[account] += 1
+    return accuracy, confusion_matrix, scene_sum
 
 
 def main(args):
@@ -112,9 +114,12 @@ def main(args):
             raise ConnectionError("Can't connect to visdom server, please run command 'python -m visdom.server'")
     except:
         warnings.warn("Can't open Visdom!")
-    print("Prepare to test model...")
-    test(model, val_data, config, vis)
-    print("Test Finish!")
+    print("Prepare to validate model...")
+    accuracy, confusion_matrix, scene_sum = validate(model, val_data, config, vis)
+    # plot(accuracy, 0, visdom, 'test_accuracy')
+    msg = 'test_accuracy:{}\naccuracy summaries:{}\nconfusion matrix:\n{}'. \
+        format(accuracy, scene_sum, confusion_matrix)
+    log(msg, vis, 'test_result', logfile='test_result.txt')
 
 
 if __name__ == '__main__':
