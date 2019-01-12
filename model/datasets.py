@@ -6,11 +6,12 @@
 # @Software: PyCharm
 
 import os
-from torch.utils import data
+import numpy as np
 from PIL import Image
+from torch.utils import data
 from torchvision import transforms as T
 from torch.utils.data import DataLoader
-import numpy as np
+from model import Config
 
 
 def _isArrayLike(obj):
@@ -55,11 +56,20 @@ class CloudDataset(data.Dataset):
         return len(self.img_paths)
 
 
-def CloudDataLoader(data_path, classes_list, batch_size, img_resize, shuffle, num_workers):
-    # type:(str,list,int,Optional(tuple,list),bool,int)->DataLoader
-    dataset = CloudDataset(data_path, classes_list, img_resize)
-    assert len(dataset) > batch_size
-    return DataLoader(dataset, batch_size, shuffle, num_workers=num_workers, drop_last=True)
+def CloudDataLoader(data_type, config):
+    # type:(str,Config)->DataLoader
+    assert data_type in ["train", "training", "val", "validation", "inference"]
+    if data_type in ["train", "training"]:
+        data_path = config.train_data_root
+        shuffle = config.shuffle_train
+        drop_last = config.drop_last_train
+    elif data_type in ["val", "validation", "inference"]:
+        data_path = config.val_data_root
+        shuffle = config.shuffle_val
+        drop_last = config.drop_last_val
+    dataset = CloudDataset(data_path, config.classes_list, config.image_resize)
+    assert len(dataset) > config.batch_size
+    return DataLoader(dataset, config.batch_size, shuffle, num_workers=config.num_data_workers, drop_last=drop_last)
 
 
 if __name__ == "__main__":

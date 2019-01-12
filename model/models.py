@@ -2,25 +2,38 @@
 # @Time    : 2019/1/6 15:41
 # @Author  : LQX
 # @Email   : qixuan.lqx@qq.com
-# @File    : model.py
+# @File    : models.py
 # @Software: PyCharm
 
 import torch as t
 from torch import nn
 from torchvision.models import vgg
 from torch.nn import functional as F
+from .config import Config
 import math
 
 
+class _BaseModule(nn.Module):
+    def __int__(self, config: Config):
+        super(_BaseModule, self).__init__()
+        self.config = config
+
+    def forward(self, input):
+        raise NotImplementedError("Should be overridden by all subclasses.")
+
+    def initialize_weights(self):
+        raise NotImplementedError("Should be overridden by all subclasses.")
+
+
 class OrdinalNet(nn.Module):
-    def __init__(self, num_classes, batch_norm=True, pretrained=False):
+    def __init__(self, config: Config):
         super(OrdinalNet, self).__init__()
-        if batch_norm:
-            self.vggnet = vgg.vgg19_bn(pretrained)
+        if config.use_batch_norm:
+            self.vggnet = vgg.vgg11_bn(config.use_pytorch_weight)
         else:
-            self.vggnet = vgg.vgg19(pretrained)
+            self.vggnet = vgg.vgg11(config.use_pytorch_weight)
         # self.vggnet = MyVGG19(3, 1000, batch_norm)
-        self.logits = nn.Linear(1000, num_classes)
+        self.logits = nn.Linear(1000, config.num_classes)
 
     def forward(self, input):
         out = F.softmax(self.vggnet(input), dim=0)
@@ -42,10 +55,11 @@ class OrdinalNet(nn.Module):
                 m.bias.data.zero_()
 
 
-class MyVGG19(nn.Module):
-    def __init__(self, in_channels, num_classes, batch_norm=False):
+class MyVGG19(_BaseModule):
+    def __init__(self, config: Config):
         super(MyVGG19, self).__init__()
-        self.batch_norm = batch_norm
+        in_channels = 3
+        self.batch_norm = config.use_batch_norm
         self.conv1_1 = nn.Conv2d(in_channels, 64, 3, 1, 1)
         self.bn1_1 = nn.BatchNorm2d(64)
         self.conv1_2 = nn.Conv2d(64, 64, 3, 1, 1)
@@ -92,7 +106,7 @@ class MyVGG19(nn.Module):
         # self.bn6 = nn.BatchNorm2d(4096)
         self.fc7 = nn.Linear(4096, 4096)
         # self.bn7 = nn.BatchNorm2d(4096)
-        self.fc8 = nn.Linear(4096, num_classes)
+        self.fc8 = nn.Linear(4096, config.num_classes)
 
     def forward(self, input):
         if self.batch_norm:

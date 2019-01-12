@@ -14,25 +14,25 @@ from torch.nn import Module
 from visdom import Visdom
 from torchnet import meter
 from collections import defaultdict
-from model import CloudDataLoader, Config, OrdinalNet, OrdinalLoss, plot, log, log_process, ipdb
+from model import CloudDataLoader, Config, get_model, OrdinalLoss, Visualizer, ipdb
 
 
-def get_model(config: Config):
-    weight_path = config.weight_load_path
-    if os.path.exists(weight_path):
-        pretrained = False
-    else:
-        pretrained = config.load_public_weight
-    model = OrdinalNet(config.num_classes, config.use_batch_norm, pretrained)
-    if os.path.exists(weight_path):
-        try:
-            model.load_state_dict(t.load(weight_path))
-            print('loaded weight from ' + weight_path)
-        except:
-            warnings.warn('Failed to load weight file ' + weight_path)
-            model.initialize_weights()
-    return model
-    # return vgg.vgg19_bn(pretrained, num_classes=config.num_classes)
+# def get_model(config: Config):
+#     weight_path = config.weight_load_path
+#     if os.path.exists(weight_path):
+#         pretrained = False
+#     else:
+#         pretrained = config.load_public_weight
+#     model = OrdinalNet(config.num_classes, config.use_batch_norm, pretrained)
+#     if os.path.exists(weight_path):
+#         try:
+#             model.load_state_dict(t.load(weight_path))
+#             print('loaded weight from ' + weight_path)
+#         except:
+#             warnings.warn('Failed to load weight file ' + weight_path)
+#             model.initialize_weights()
+#     return model
+#     # return vgg.vgg19_bn(use_pytorch_weight, num_classes=config.num_classes)
 
 
 def get_data(data_path, config: Config, shuffle):
@@ -59,7 +59,7 @@ def get_optimizer(model: Module, config: Config) -> t.optim.Optimizer:
         raise RuntimeError("Invalid value: config.optimizer")
 
 
-def validate(model, val_data, config, visdom):
+def validate(model, val_data, config, vis):
     # type: (Module,CloudDataLoader,CloudDataLoader,Config,Visdom)->None
     # move model to GPU
     if config.use_gpu:
@@ -88,7 +88,7 @@ def validate(model, val_data, config, visdom):
         if i % config.ckpt_freq == 0:
             msg = "[Validation]process:{}/{}, confusion matrix:\n{}".format(
                 i, len(val_data), confusion_matrix.value())
-            log_process(i, len(val_data), msg, visdom, 'val_log', append=True)
+            vis.log_process(i, len(val_data), msg, 'val_log', append=True)
         del batch_img, batch_label, batch_scene, batch_probs, preds, compares
         t.cuda.empty_cache()
 
@@ -104,22 +104,17 @@ def validate(model, val_data, config, visdom):
 
 
 def main(args):
-    config = Config()
+    config = Config('inference')
     print(config)
-    val_data = get_data(config.val_data_root, config, shuffle=config.shuffle_val)
+    val_data = get_data("val", config)
     model = get_model(config)
-    try:
-        vis = Visdom(env=config.visdom_env)
-        if not vis.check_connection():
-            raise ConnectionError("Can't connect to visdom server, please run command 'python -m visdom.server'")
-    except:
-        warnings.warn("Can't open Visdom!")
+    vis = Visualizer(config)
     print("Prepare to validate model...")
     accuracy, confusion_matrix, scene_sum = validate(model, val_data, config, vis)
     # plot(accuracy, 0, visdom, 'test_accuracy')
-    msg = 'test_accuracy:{}\naccuracy summaries:{}\nconfusion matrix:\n{}'. \
+    msg = 'val_accuracy:{}\naccuracy summaries:{}\nconfusion matrix:\n{}'. \
         format(accuracy, scene_sum, confusion_matrix)
-    log(msg, vis, 'test_result', logfile='test_result.txt')
+    vis.log(msg, 'val_result', logfile='val_result.txt')
 
 
 if __name__ == '__main__':

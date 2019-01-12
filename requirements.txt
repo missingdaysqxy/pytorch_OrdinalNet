@@ -1,0 +1,8 @@
+torchvision
+visdom
+opencv_python
+torch>=1.0
+numpy
+torchnet
+Pillow
+ipdb

@@ -14,31 +14,12 @@ from torch.autograd import Variable as V
 from torch.nn import Module
 from visdom import Visdom
 from torchnet import meter
-from model import CloudDataLoader, Config, OrdinalNet, OrdinalLoss, plot, log_process, record_train_process, ipdb
-from validate import validate as val
+from model import CloudDataLoader, Config, get_model, OrdinalLoss, Visualizer, ipdb
+from validate import validate as val;
 
 
-def get_model(config: Config):
-    weight_path = config.weight_load_path
-    if os.path.exists(weight_path):
-        pretrained = False
-    else:
-        pretrained = config.load_public_weight
-    model = OrdinalNet(config.num_classes, config.use_batch_norm, pretrained)
-    if os.path.exists(weight_path):
-        try:
-            model.load_state_dict(t.load(weight_path))
-            print('loaded weight from ' + weight_path)
-        except:
-            warnings.warn('Failed to load weight file ' + weight_path)
-            model.initialize_weights()
-    return model
-    # return vgg.vgg19_bn(pretrained, num_classes=config.num_classes)
-
-
-def get_data(data_path, config: Config, shuffle):
-    data = CloudDataLoader(data_path, config.classes_list, config.batch_size, config.image_resize, shuffle,
-                           config.num_data_workers)
+def get_data(data_type, config: Config):
+    data = CloudDataLoader(data_type, config)
     return data
 
 
@@ -80,12 +61,8 @@ def resume_train(optimizer: Module, config: Config) -> int:
     return last_epoch
 
 
-def train(model, train_data, val_data, config, visdom):
-    # type: (Module,CloudDataLoader,CloudDataLoader,Config,Visdom)->None
-    # move model to GPU
-    if config.use_gpu:
-        model = model.cuda()
-        model = t.nn.DataParallel(model, config.gpu_list)
+def train(model, train_data, val_data, config, vis):
+    # type: (Module,CloudDataLoader,CloudDataLoader,Config,Visualizer)->None
     # init loss and optim
     criterion = get_loss_function(config)
     optimizer = get_optimizer(model, config)
@@ -132,12 +109,12 @@ def train(model, train_data, val_data, config, visdom):
                 cm_value = confusion_matrix.value()
                 num_correct = cm_value.trace().astype(np.float)
                 train_acc = 100 * num_correct / cm_value.sum()
-                plot(loss_mean, step, visdom, 'loss:' + config.loss_type)
-                plot(train_acc, step, visdom, 'train_accuracy')
+                vis.plot(loss_mean, step, 'loss:' + config.loss_type)
+                vis.plot(train_acc, step, 'train_accuracy')
                 lr = optimizer.param_groups[0]['lr']
                 msg = "epoch:{},iteration:{}/{},loss:{},train_accuracy:{},lr:{},confusion_matrix:\n{}".format(
                     epoch, i, len(train_data), loss_mean, train_acc, lr, confusion_matrix.value())
-                log_process(i, len(train_data), msg, visdom, 'train_log')
+                vis.log_process(i, len(train_data), msg, 'train_log')
                 # save checkpoint
                 t.save(model.state_dict(), config.temp_weight_path)
                 t.save(optimizer.state_dict(), config.temp_optim_path)
@@ -146,9 +123,9 @@ def train(model, train_data, val_data, config, visdom):
                     ipdb.set_trace()
         # validate after each epoch
         val_acc, confusion_matrix = val(model, val_data, config, visdom)
-        plot(val_acc, epoch, visdom, 'val_accuracy')
+        vis.plot(val_acc, epoch, 'val_accuracy')
         # record train process
-        record_train_process(config, epoch, epoch_start, time.time() - epoch_start, loss_mean, train_acc, val_acc)
+        vis.record_train_process(epoch, epoch_start, time.time() - epoch_start, loss_mean, train_acc, val_acc)
 
 
 # def val(model, val_data, config, visdom):
@@ -177,17 +154,12 @@ def train(model, train_data, val_data, config, visdom):
 
 
 def main(args):
-    config = Config()
+    config = Config('train')
     print(config)
-    train_data = get_data(config.train_data_root, config, shuffle=config.shuffle_train)
-    val_data = get_data(config.val_data_root, config, shuffle=config.shuffle_val)
+    train_data = get_data("train", config)
+    val_data = get_data("val", config)
     model = get_model(config)
-    try:
-        vis = Visdom(env=config.visdom_env)
-        if not vis.check_connection():
-            raise ConnectionError("Can't connect to visdom server, please run command 'python -m visdom.server'")
-    except:
-        warnings.warn("Can't open Visdom!")
+    vis = Visualizer(config)
     print("Prepare to train model...")
     train(model, train_data, val_data, config, vis)
     # save model
