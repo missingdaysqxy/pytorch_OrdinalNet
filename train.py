@@ -6,16 +6,14 @@
 # @Software: PyCharm
 
 import os
-import warnings
 import time
 import numpy as np
 import torch as t
-from torch.autograd import Variable as V
+from warnings import warn
 from torch.nn import Module
-from visdom import Visdom
 from torchnet import meter
-from model import CloudDataLoader, Config, get_model, OrdinalLoss, Visualizer, ipdb
-from validate import validate as val;
+from model import *
+from validate import validate as val
 
 
 def get_data(data_type, config: Config):
@@ -39,26 +37,6 @@ def get_optimizer(model: Module, config: Config) -> t.optim.Optimizer:
         return t.optim.Adam(model.parameters())
     else:
         raise RuntimeError("Invalid value: config.optimizer")
-
-
-def resume_train(optimizer: Module, config: Config) -> int:
-    last_epoch = -1
-    if os.path.exists(config.temp_optim_path):
-        try:
-            optimizer.load_state_dict(t.load(config.temp_optim_path))
-        except:
-            warnings.warn("Invalid temp optimizer file " + config.temp_optim_path)
-            os.rename(config.temp_optim_path, config.temp_optim_path + '.badfile')
-    if os.path.exists(config.train_record_file):
-        try:
-            with open(config.train_record_file, 'r') as f:
-                last = f.readlines()[-1]
-                import json
-                info = json.loads(last)
-                last_epoch = int(info["epoch"])
-        except:
-            warnings.warn("Can't read last_epoch from file " + config.train_record_file)
-    return last_epoch
 
 
 def train(model, train_data, val_data, config, vis):
@@ -122,10 +100,10 @@ def train(model, train_data, val_data, config, vis):
                 if os.path.exists(config.debug_flag_file):
                     ipdb.set_trace()
         # validate after each epoch
-        val_acc, confusion_matrix = val(model, val_data, config, visdom)
+        val_acc, confusion_matrix = val(model, val_data, config, vis)
         vis.plot(val_acc, epoch, 'val_accuracy')
         # record train process
-        vis.record_train_process(epoch, epoch_start, time.time() - epoch_start, loss_mean, train_acc, val_acc)
+        record_train_process(config, epoch, epoch_start, time.time() - epoch_start, loss_mean, train_acc, val_acc)
 
 
 # def val(model, val_data, config, visdom):

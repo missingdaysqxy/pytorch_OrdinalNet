@@ -21,18 +21,18 @@ class Config(object):
     drop_last_val = False
 
     # efficiency config
-    use_gpu = True      # if there's no cuda-available GPUs, this will turn to False automatically
-    num_data_workers = 4    # how many subprocesses to use for data loading
-    pin_memory = True    # only set to True when your machine's memory is large enough
-    max_epoch = 15
-    batch_size = 16
+    use_gpu = True  # if there's no cuda-available GPUs, this will turn to False automatically
+    num_data_workers = 4  # how many subprocesses to use for data loading
+    pin_memory = True  # only set to True when your machine's memory is large enough
+    time_out = 20   #  max seconds for loading a batch of data, 0 means non-limit
+    max_epoch = 15  # how many epochs for training
+    batch_size = 16 # how many images for a batch
 
     # weight S/L config
-    load_public_weight = True
-    weight_load_path = r'checkpoints/crossentropy_vgg.pth'
-    weight_save_path = r'checkpoints/crossentropy_vgg.pth'
-    log_root = r'logs'
-
+    load_public_weight = True   # set True to auto-download pre-trained weights by pytorch
+    weight_load_path = r'checkpoints/crossentropy_vgg.pth'  # where to load pre-trained weight for further training
+    weight_save_path = r'checkpoints/crossentropy_vgg.pth'  # where to save trained weights for further usage
+    log_root = r'logs'  # where to save logs, includes temporary weights of module and optimizer, train_record json list
     debug_flag_file = r'debug'
 
     # module config
@@ -50,8 +50,9 @@ class Config(object):
     visdom_env = 'main'
     ckpt_freq = 10  # save checkpoint after these iterations
 
-    def __init__(self, mode):
+    def __init__(self, mode: str):
         assert mode in ['train', 'inference']
+        self.mode = mode
         self.grad_enable = mode == 'train'
         self.start_time = timestr('%Y%m%d%H%M%S')
         # data config
@@ -87,14 +88,14 @@ class Config(object):
         else:
             self.use_pytorch_weight = False
         os.makedirs(self.log_root, exist_ok=True)
-        assert os.path.isdir(self.log_path)
-        self.vis_env_path = os.path.join(self.log_path, 'visdom_{}.json'.format(self.visdom_env))
+        assert os.path.isdir(self.log_root)
+        self.vis_env_path = os.path.join(self.log_root, 'visdom_{}.json'.format(self.visdom_env))
         self.temp_weight_path = os.path.join(self.log_root, 'tmpmodel{}.pth'.format(self.start_time))
         self.temp_optim_path = os.path.join(self.log_root, 'tmp{}{}.pth'.format(self.optimizer, self.start_time))
-        self.log_path = os.path.join(self.log_root, 'logfile{}.txt'.format(self.start_time))
+        self.log_file = os.path.join(self.log_root, 'logfile{}.txt'.format(self.start_time))
         self.train_record_file = os.path.join(self.log_root, 'train_record.jsons.txt')
         """
-       reocrd training process with informations of 
+       record training process with informations of 
        [epoch, start time, elapsed time, loss value, train accuracy, validate accuracy]
        DO NOT CHANGE IT unless you know what you're doing!!!
        """
@@ -117,13 +118,8 @@ class Config(object):
 
     def __str__(self):
         """:return Configuration details."""
-        str = "Configurations:\n"
+        str = "Configurations for %s:\n" % self.mode
         for a in dir(self):
             if not a.startswith("__") and not callable(getattr(self, a)):
                 str += "{:30} {}\n".format(a, getattr(self, a))
         return str
-
-
-def main(args):
-    config = Config()
-    print(config)

@@ -11,7 +11,6 @@ import numpy as np
 import torch as t
 from torch.autograd import Variable as V
 from torch.nn import Module
-from visdom import Visdom
 from torchnet import meter
 from collections import defaultdict
 from model import CloudDataLoader, Config, get_model, OrdinalLoss, Visualizer, ipdb
@@ -35,9 +34,8 @@ from model import CloudDataLoader, Config, get_model, OrdinalLoss, Visualizer, i
 #     # return vgg.vgg19_bn(use_pytorch_weight, num_classes=config.num_classes)
 
 
-def get_data(data_path, config: Config, shuffle):
-    data = CloudDataLoader(data_path, config.classes_list, config.batch_size, config.image_resize, shuffle,
-                           config.num_data_workers)
+def get_data(data_type, config: Config):
+    data = CloudDataLoader(data_type, config)
     return data
 
 
@@ -60,7 +58,7 @@ def get_optimizer(model: Module, config: Config) -> t.optim.Optimizer:
 
 
 def validate(model, val_data, config, vis):
-    # type: (Module,CloudDataLoader,CloudDataLoader,Config,Visdom)->None
+    # type: (Module,CloudDataLoader,Config,Visualizer)->None
     # move model to GPU
     if config.use_gpu:
         model = model.cuda()

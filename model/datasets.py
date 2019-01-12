@@ -11,7 +11,7 @@ from PIL import Image
 from torch.utils import data
 from torchvision import transforms as T
 from torch.utils.data import DataLoader
-from model import Config
+from model.config import Config
 
 
 def _isArrayLike(obj):
@@ -69,7 +69,8 @@ def CloudDataLoader(data_type, config):
         drop_last = config.drop_last_val
     dataset = CloudDataset(data_path, config.classes_list, config.image_resize)
     assert len(dataset) > config.batch_size
-    return DataLoader(dataset, config.batch_size, shuffle, num_workers=config.num_data_workers, drop_last=drop_last)
+    return DataLoader(dataset, config.batch_size, shuffle, num_workers=config.num_data_workers,
+                      pin_memory=config.pin_memory, drop_last=drop_last, timeout=config.time_out)
 
 
 if __name__ == "__main__":

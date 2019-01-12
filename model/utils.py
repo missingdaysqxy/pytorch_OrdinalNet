@@ -13,7 +13,7 @@ import numpy as np
 from warnings import warn
 from visdom import Visdom, server as VisdomServer
 from time import strftime as timestr
-from model import Config
+from model.config import Config
 
 
 class Visualizer(object):
@@ -38,6 +38,10 @@ class Visualizer(object):
                 #     warn(e)
         except ConnectionError as e:
             warn("Can't open Visdom because " + e.strerror)
+        with open(self.config.log_path, 'a') as f:
+            info = "[{time}]Initialize Visdom\n".format(time=timestr('%m-%d %H:%M:%S'))
+            info+=str(self.config)
+            f.write(info + '\n')
 
     def save(self, save_path: str = None) -> str:
         retstr = self.visdom.save([self.config.visdom_env])
@@ -56,11 +60,6 @@ class Visualizer(object):
         except:
             pass
         return None
-
-    def record_train_process(self, epoch, start, elapsed, loss, train_acc, val_acc):
-        with open(self.config.train_record_file, 'a') as f:
-            str = self.config.__record_dict__.format(epoch, start, elapsed, loss, train_acc, val_acc)
-            f.write(str + '\n')
 
     def plot(self, y, x, name):
         # type:(int,int,str,Config)->None

@@ -5,12 +5,14 @@
 # @File    : models.py
 # @Software: PyCharm
 
+import os
+import math
 import torch as t
+from warnings import warn
 from torch import nn
 from torchvision.models import vgg
 from torch.nn import functional as F
-from .config import Config
-import math
+from model.config import Config
 
 
 class _BaseModule(nn.Module):
@@ -25,7 +27,7 @@ class _BaseModule(nn.Module):
         raise NotImplementedError("Should be overridden by all subclasses.")
 
 
-class OrdinalNet(nn.Module):
+class OrdinalNet(_BaseModule):
     def __init__(self, config: Config):
         super(OrdinalNet, self).__init__()
         if config.use_batch_norm:
@@ -180,72 +182,57 @@ class MyVGG19(_BaseModule):
         return out
 
 
-'''
-VGG(
-  (features): Sequential(
-    (0): Conv2d(3, 64, kernel_size=(3, 3), stride=(1, 1), padding=(1, 1))
-    (1): BatchNorm2d(64, eps=1e-05, momentum=0.1, affine=True, track_running_stats=True)
-    (2): ReLU(inplace)
-    (3): Conv2d(64, 64, kernel_size=(3, 3), stride=(1, 1), padding=(1, 1))
-    (4): BatchNorm2d(64, eps=1e-05, momentum=0.1, affine=True, track_running_stats=True)
-    (5): ReLU(inplace)
-    (6): MaxPool2d(kernel_size=2, stride=2, padding=0, dilation=1, ceil_mode=False)
-    (7): Conv2d(64, 128, kernel_size=(3, 3), stride=(1, 1), padding=(1, 1))
-    (8): BatchNorm2d(128, eps=1e-05, momentum=0.1, affine=True, track_running_stats=True)
-    (9): ReLU(inplace)
-    (10): Conv2d(128, 128, kernel_size=(3, 3), stride=(1, 1), padding=(1, 1))
-    (11): BatchNorm2d(128, eps=1e-05, momentum=0.1, affine=True, track_running_stats=True)
-    (12): ReLU(inplace)
-    (13): MaxPool2d(kernel_size=2, stride=2, padding=0, dilation=1, ceil_mode=False)
-    (14): Conv2d(128, 256, kernel_size=(3, 3), stride=(1, 1), padding=(1, 1))
-    (15): BatchNorm2d(256, eps=1e-05, momentum=0.1, affine=True, track_running_stats=True)
-    (16): ReLU(inplace)
-    (17): Conv2d(256, 256, kernel_size=(3, 3), stride=(1, 1), padding=(1, 1))
-    (18): BatchNorm2d(256, eps=1e-05, momentum=0.1, affine=True, track_running_stats=True)
-    (19): ReLU(inplace)
-    (20): Conv2d(256, 256, kernel_size=(3, 3), stride=(1, 1), padding=(1, 1))
-    (21): BatchNorm2d(256, eps=1e-05, momentum=0.1, affine=True, track_running_stats=True)
-    (22): ReLU(inplace)
-    (23): Conv2d(256, 256, kernel_size=(3, 3), stride=(1, 1), padding=(1, 1))
-    (24): BatchNorm2d(256, eps=1e-05, momentum=0.1, affine=True, track_running_stats=True)
-    (25): ReLU(inplace)
-    (26): MaxPool2d(kernel_size=2, stride=2, padding=0, dilation=1, ceil_mode=False)
-    (27): Conv2d(256, 512, kernel_size=(3, 3), stride=(1, 1), padding=(1, 1))
-    (28): BatchNorm2d(512, eps=1e-05, momentum=0.1, affine=True, track_running_stats=True)
-    (29): ReLU(inplace)
-    (30): Conv2d(512, 512, kernel_size=(3, 3), stride=(1, 1), padding=(1, 1))
-    (31): BatchNorm2d(512, eps=1e-05, momentum=0.1, affine=True, track_running_stats=True)
-    (32): ReLU(inplace)
-    (33): Conv2d(512, 512, kernel_size=(3, 3), stride=(1, 1), padding=(1, 1))
-    (34): BatchNorm2d(512, eps=1e-05, momentum=0.1, affine=True, track_running_stats=True)
-    (35): ReLU(inplace)
-    (36): Conv2d(512, 512, kernel_size=(3, 3), stride=(1, 1), padding=(1, 1))
-    (37): BatchNorm2d(512, eps=1e-05, momentum=0.1, affine=True, track_running_stats=True)
-    (38): ReLU(inplace)
-    (39): MaxPool2d(kernel_size=2, stride=2, padding=0, dilation=1, ceil_mode=False)
-    (40): Conv2d(512, 512, kernel_size=(3, 3), stride=(1, 1), padding=(1, 1))
-    (41): BatchNorm2d(512, eps=1e-05, momentum=0.1, affine=True, track_running_stats=True)
-    (42): ReLU(inplace)
-    (43): Conv2d(512, 512, kernel_size=(3, 3), stride=(1, 1), padding=(1, 1))
-    (44): BatchNorm2d(512, eps=1e-05, momentum=0.1, affine=True, track_running_stats=True)
-    (45): ReLU(inplace)
-    (46): Conv2d(512, 512, kernel_size=(3, 3), stride=(1, 1), padding=(1, 1))
-    (47): BatchNorm2d(512, eps=1e-05, momentum=0.1, affine=True, track_running_stats=True)
-    (48): ReLU(inplace)
-    (49): Conv2d(512, 512, kernel_size=(3, 3), stride=(1, 1), padding=(1, 1))
-    (50): BatchNorm2d(512, eps=1e-05, momentum=0.1, affine=True, track_running_stats=True)
-    (51): ReLU(inplace)
-    (52): MaxPool2d(kernel_size=2, stride=2, padding=0, dilation=1, ceil_mode=False)
-  )
-  (classifier): Sequential(
-    (0): Linear(in_features=25088, out_features=4096, bias=True)
-    (1): ReLU(inplace)
-    (2): Dropout(p=0.5)
-    (3): Linear(in_features=4096, out_features=4096, bias=True)
-    (4): ReLU(inplace)
-    (5): Dropout(p=0.5)
-    (6): Linear(in_features=4096, out_features=6, bias=True)
-  )
-)
+def record_train_process(config: Config, epoch: int, start_time, elapsed_time, loss: float, train_acc: float,
+                         val_acc: float):
+    '''
+    generate temporary training process data for resuming by resume_train()
+    :param self:
+    :param epoch:
+    :param start_time:
+    :param elapsed_time:
+    :param loss:
+    :param train_acc:
+    :param val_acc:
+    :return:
+    '''
+    with open(config.train_record_file, 'a') as f:
+        str = config.__record_dict__.format(epoch, start_time, elapsed_time, loss, train_acc, val_acc)
+        f.write(str + '\n')
 
-'''
+
+def resume_train(config: Config, model: nn.Module, optimizer: nn.Module = None) -> int:
+    '''
+    resume training process data from config.logs whice generated by record_train_process()
+    :param config:
+    :param model:
+    :param optimizer:
+    :return:
+    '''
+    last_epoch = -1
+    if os.path.exists(config.temp_weight_path):
+        try:
+            model.load_state_dict(t.load(config.temp_weight_path))
+        except:
+            warn("Move invalid temp {} weights file {} to {}".format(type(model), config.temp_weight_path,
+                                                                     config.temp_weight_path + '.badfile'))
+            os.rename(config.temp_weight_path, config.temp_weight_path + '.badfile')
+    if optimizer is not None and os.path.exists(config.temp_optim_path):
+        try:
+            optimizer.load_state_dict(t.load(config.temp_optim_path))
+        except:
+            warn("Move invalid temp {} weights file {} to {}".format(type(optimizer), config.temp_optim_path,
+                                                                     config.temp_optim_path + '.badfile'))
+            os.rename(config.temp_optim_path, config.temp_optim_path + '.badfile')
+    if os.path.exists(config.train_record_file):
+        try:
+            with open(config.train_record_file, 'r') as f:
+                last = f.readlines()[-1]
+                import json
+                info = json.loads(last)
+                last_epoch = int(info["epoch"])
+        except:
+            warn("Move invalid train record file{} to {}".format(config.train_record_file,
+                                                                 config.train_record_file + '.badfile'))
+            warn("Can't get last_epoch value, {} will be returned".format(last_epoch))
+            os.rename(config.train_record_file, config.train_record_file + '.badfile')
+    return last_epoch

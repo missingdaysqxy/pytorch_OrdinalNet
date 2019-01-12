@@ -5,7 +5,7 @@
 # @File    : __init__.py
 # @Software: PyCharm
 
-from .models import _BaseModule, OrdinalNet, MyVGG19
+from .models import _BaseModule, OrdinalNet, MyVGG19, record_train_process, resume_train
 from .datasets import CloudDataLoader, CloudDataset, _isArrayLike
 from .config import Config
 from .utils import Visualizer
