@@ -14,6 +14,7 @@ class Config(object):
     # data config
     train_data_root = r'D:\qixuan\Documents\PythonProjects\clouds_data\mode_2004\train'
     val_data_root = r'D:\qixuan\Documents\PythonProjects\clouds_data\mode_2004\validation'
+    reload_data = True # update and reload datasets every time
     classes_list = ['A', 'B', 'C', 'D', 'E', 'nodata']
     shuffle_train = True
     shuffle_val = True
@@ -29,7 +30,8 @@ class Config(object):
     batch_size = 16  # how many images for a batch
 
     # weight S/L config
-    load_public_weight = True  # if file `weight_load_path` don't exist, auto-download pre-trained weights by pytorch
+    # todo: delete this
+    # load_public_weight = False  # if file `weight_load_path` don't exist, auto-download pre-trained weights by pytorch
     weight_load_path = r'checkpoints/crossentropy_vgg.pth'  # where to load pre-trained weight for further training
     weight_save_path = r'checkpoints/crossentropy_vgg.pth'  # where to save trained weights for further usage
     log_root = r'logs'  # where to save logs, includes temporary weights of module and optimizer, train_record json list
@@ -73,7 +75,7 @@ class Config(object):
                     "Can't split a batch of data with batch_size {} averagely into {} gpu(s)" \
                         .format(self.batch_size, self.num_gpu)
             else:
-                warn("There is no available cuda devices on this machine, use_gpu will be set to False.")
+                warn("Can't find available cuda devices, use_gpu will be automatically set to False.")
                 self.use_gpu = False
                 self.num_gpu = 0
                 self.gpu_list = []
@@ -88,13 +90,16 @@ class Config(object):
         else:
             self.map_location = "cpu"
         # weight S/L config
-        if self.load_public_weight and not os.path.exists(self.weight_load_path):
-            warn("Can't find weight file in config.weight_load_path: " + self.weight_load_path)
-            self.use_pytorch_weight = True
-        else:
-            self.use_pytorch_weight = False
+        # todo: delete this
+        # if self.load_public_weight and not os.path.exists(self.weight_load_path):
+        #     warn("Can't find weight file in config.weight_load_path: " + self.weight_load_path)
+        #     self.use_pytorch_weight = True
+        # else:
+        #     self.use_pytorch_weight = False
         os.makedirs(self.log_root, exist_ok=True)
         assert os.path.isdir(self.log_root)
+        self.train_catalog_json = os.path.join(self.log_root, "train_catalog.json")
+        self.val_catalog_json = os.path.join(self.log_root, "val_catalog.json")
         self.vis_env_path = os.path.join(self.log_root, 'visdom_{}.json'.format(self.visdom_env))
         self.temp_weight_path = os.path.join(self.log_root, 'tmpmodel{}.pth'.format(self.init_time))
         self.temp_optim_path = os.path.join(self.log_root, 'tmp{}{}.pth'.format(self.optimizer, self.init_time))

@@ -8,4 +8,4 @@
 
 from core.models._base import _BaseModule, get_model, make_checkpoint, resume_checkpoint
 from core.models.ordinalnet import OrdinalNet
-from core.models.vgg_regression import VGG
+from core.models.cnn import VGG

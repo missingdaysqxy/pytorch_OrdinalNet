@@ -6,6 +6,7 @@
 # @Software: PyCharm
 
 import os
+import time
 from torch import save, load, set_grad_enabled
 from warnings import warn
 from torch.nn import Module, DataParallel
@@ -62,7 +63,7 @@ def get_model(config: Config, **kwargs) -> _BaseModule:
     return model
 
 
-def make_checkpoint(config, epoch, start_time, elapsed_time, loss_val, train_acc, val_acc, model, optimizer=None):
+def make_checkpoint(config, epoch, start_time, loss_val, train_acc, val_acc, model, optimizer=None):
     # type:(Config,int,str,str,float,float,float,Module,Optimizer)->None
     """
     generate temporary training process data for resuming by resume_checkpoint()
@@ -71,6 +72,7 @@ def make_checkpoint(config, epoch, start_time, elapsed_time, loss_val, train_acc
     if optimizer is not None and hasattr(optimizer, "state_dict"):
         save(optimizer.state_dict(), config.temp_optim_path)
     with open(config.train_record_file, 'a+') as f:
+        elapsed_time = time.time() - start_time,
         record = config.__record_dict__.format(epoch, start_time, elapsed_time, loss_val, train_acc, val_acc)
         f.write(record + '\n')
 
@@ -109,5 +111,6 @@ def resume_checkpoint(config: Config, model: Module, optimizer: Optimizer = None
             os.rename(config.train_record_file, config.train_record_file + '.badfile')
     return last_epoch
 
-if __name__=="__main__":
+
+if __name__ == "__main__":
     pass

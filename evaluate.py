@@ -6,6 +6,7 @@
 # @Software: PyCharm
 
 import os
+from .datasets import CloudDataLoader
 
 
 def main(args):

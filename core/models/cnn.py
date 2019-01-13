@@ -2,7 +2,7 @@
 # @Time    : 2019/1/13/013 19:50 下午
 # @Author  : qixuan
 # @Email   : qixuan.lqx@qq.com
-# @File    : vgg_regression.py
+# @File    : cnn.py
 # @Software: PyCharm
 
 import torch.nn as nn

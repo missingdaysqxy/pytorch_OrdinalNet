@@ -13,7 +13,8 @@ from torch.autograd import Variable as V
 from torch.nn import Module
 from torchnet import meter
 from collections import defaultdict
-from core import CloudDataLoader, Config, get_model, OrdinalLoss, Visualizer, ipdb
+from core import Config, get_model, OrdinalLoss, Visualizer, ipdb
+from .datasets import CloudDataLoader
 
 
 # def get_model(config: Config):
