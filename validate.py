@@ -13,7 +13,7 @@ from torch.autograd import Variable as V
 from torch.nn import Module
 from torchnet import meter
 from collections import defaultdict
-from model import CloudDataLoader, Config, get_model, OrdinalLoss, Visualizer, ipdb
+from core import CloudDataLoader, Config, get_model, OrdinalLoss, Visualizer, ipdb
 
 
 # def get_model(config: Config):
@@ -22,15 +22,15 @@ from model import CloudDataLoader, Config, get_model, OrdinalLoss, Visualizer, i
 #         pretrained = False
 #     else:
 #         pretrained = config.load_public_weight
-#     model = OrdinalNet(config.num_classes, config.use_batch_norm, pretrained)
+#     core = OrdinalNet(config.num_classes, config.use_batch_norm, pretrained)
 #     if os.path.exists(weight_path):
 #         try:
-#             model.load_state_dict(t.load(weight_path))
+#             core.load_state_dict(t.load(weight_path))
 #             print('loaded weight from ' + weight_path)
 #         except:
 #             warnings.warn('Failed to load weight file ' + weight_path)
-#             model.initialize_weights()
-#     return model
+#             core.initialize_weights()
+#     return core
 #     # return vgg.vgg19_bn(use_pytorch_weight, num_classes=config.num_classes)
 
 
@@ -59,7 +59,7 @@ def get_optimizer(model: Module, config: Config) -> t.optim.Optimizer:
 
 def validate(model, val_data, config, vis):
     # type: (Module,CloudDataLoader,Config,Visualizer)->None
-    # move model to GPU
+    # move core to GPU
     if config.use_gpu:
         model = model.cuda()
         model = t.nn.DataParallel(model, config.gpu_list)
@@ -107,7 +107,7 @@ def main(args):
     val_data = get_data("val", config)
     model = get_model(config)
     vis = Visualizer(config)
-    print("Prepare to validate model...")
+    print("Prepare to validate core...")
     accuracy, confusion_matrix, scene_sum = validate(model, val_data, config, vis)
     # plot(accuracy, 0, visdom, 'test_accuracy')
     msg = 'val_accuracy:{}\naccuracy summaries:{}\nconfusion matrix:\n{}'. \

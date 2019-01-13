@@ -12,7 +12,7 @@ import torch as t
 from warnings import warn
 from torch.nn import Module
 from torchnet import meter
-from model import *
+from core import *
 from validate import validate as val
 
 
@@ -46,7 +46,7 @@ def train(model, train_data, val_data, config, vis):
     optimizer = get_optimizer(model, config)
     scheduler = t.optim.lr_scheduler.StepLR(optimizer, 1, config.lr_decay)
     # try to resume
-    last_epoch = resume_train(optimizer, config)
+    last_epoch = resume_checkpoint(optimizer, config)
     assert last_epoch + 1 < config.max_epoch, \
         "previous training has reached epoch {}, please increase the max_epoch in {}".format(last_epoch + 1,
                                                                                              type(config))
@@ -93,22 +93,21 @@ def train(model, train_data, val_data, config, vis):
                 msg = "epoch:{},iteration:{}/{},loss:{},train_accuracy:{},lr:{},confusion_matrix:\n{}".format(
                     epoch, i, len(train_data), loss_mean, train_acc, lr, confusion_matrix.value())
                 vis.log_process(i, len(train_data), msg, 'train_log')
-                # save checkpoint
-                t.save(model.state_dict(), config.temp_weight_path)
-                t.save(optimizer.state_dict(), config.temp_optim_path)
+
                 # check if debug file occur
                 if os.path.exists(config.debug_flag_file):
                     ipdb.set_trace()
         # validate after each epoch
         val_acc, confusion_matrix = val(model, val_data, config, vis)
         vis.plot(val_acc, epoch, 'val_accuracy')
-        # record train process
+        # save checkpoint
+
         record_train_process(config, epoch, epoch_start, time.time() - epoch_start, loss_mean, train_acc, val_acc)
 
 
-# def val(model, val_data, config, visdom):
+# def val(core, val_data, config, visdom):
 #     # type: (Module,CloudDataLoader,CloudDataLoader,Config,Visdom)->[float,meter.ConfusionMeter]
-#     model.eval()
+#     core.eval()
 #     confusion_matrix = meter.ConfusionMeter(config.num_classes)
 #     for i, input in enumerate(val_data):
 #         # input data
@@ -119,7 +118,7 @@ def train(model, train_data, val_data, config, vis):
 #             batch_img = batch_img.cuda()
 #             batch_label = batch_label.cuda()
 #         # forward
-#         batch_probs = model(batch_img)
+#         batch_probs = core(batch_img)
 #         confusion_matrix.add(batch_probs.data.squeeze(), batch_label.data.long())
 #         if i % config.ckpt_freq == config.ckpt_freq - 1:
 #             msg = "[Validation]process:{}/{}, confusion matrix:\n{}".format(
@@ -138,10 +137,10 @@ def main(args):
     val_data = get_data("val", config)
     model = get_model(config)
     vis = Visualizer(config)
-    print("Prepare to train model...")
+    print("Prepare to train core...")
     train(model, train_data, val_data, config, vis)
-    # save model
-    print("Training Finish! Saving model...")
+    # save core
+    print("Training Finish! Saving core...")
     t.save(model.state_dict(), config.weight_save_path)
     os.remove(config.temp_optim_path)
     os.remove(config.temp_weight_path)

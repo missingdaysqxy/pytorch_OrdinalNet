@@ -24,19 +24,19 @@ class Config(object):
     use_gpu = True  # if there's no cuda-available GPUs, this will turn to False automatically
     num_data_workers = 4  # how many subprocesses to use for data loading
     pin_memory = True  # only set to True when your machine's memory is large enough
-    time_out = 20   #  max seconds for loading a batch of data, 0 means non-limit
+    time_out = 20  # max seconds for loading a batch of data, 0 means non-limit
     max_epoch = 15  # how many epochs for training
-    batch_size = 16 # how many images for a batch
+    batch_size = 16  # how many images for a batch
 
     # weight S/L config
-    load_public_weight = True   # set True to auto-download pre-trained weights by pytorch
+    load_public_weight = True  # if file `weight_load_path` don't exist, auto-download pre-trained weights by pytorch
     weight_load_path = r'checkpoints/crossentropy_vgg.pth'  # where to load pre-trained weight for further training
     weight_save_path = r'checkpoints/crossentropy_vgg.pth'  # where to save trained weights for further usage
     log_root = r'logs'  # where to save logs, includes temporary weights of module and optimizer, train_record json list
     debug_flag_file = r'debug'
 
     # module config
-    module_name = "OrdinalNet"
+    module = "OrdinalNet"
     image_resize = [224, 224]
     use_batch_norm = True
     loss_type = "ce"
@@ -50,11 +50,17 @@ class Config(object):
     visdom_env = 'main'
     ckpt_freq = 10  # save checkpoint after these iterations
 
-    def __init__(self, mode: str):
-        assert mode in ['train', 'inference']
+    def __init__(self, mode: str, **kwargs):
+        if mode not in ['train', 'inference']:
+            warn("Invalid argument mode, expect 'train' or 'inference' but got '%s'" % mode)
         self.mode = mode
-        self.grad_enable = mode == 'train'
-        self.start_time = timestr('%Y%m%d%H%M%S')
+        self.enable_grad = mode == 'train'
+        self.init_time = timestr('%Y%m%d%H%M%S')
+        for key, value in kwargs.items():
+            if hasattr(self, key):
+                setattr(self, key, value)
+            else:
+                warn("{} has no attribute {}:{}".format(type(self), key, value))
         # data config
         self.num_classes = len(self.classes_list)
         # efficiency config
@@ -64,7 +70,8 @@ class Config(object):
                 self.num_gpu = device_count()
                 self.gpu_list = list(range(self.num_gpu))
                 assert self.batch_size % self.num_gpu == 0, \
-                    "Can't split a batch of {} datas averagely into {} gpus".format(self.batch_size, self.num_gpu)
+                    "Can't split a batch of data with batch_size {} averagely into {} gpu(s)" \
+                        .format(self.batch_size, self.num_gpu)
             else:
                 warn("There is no available cuda devices on this machine, use_gpu will be set to False.")
                 self.use_gpu = False
@@ -82,28 +89,27 @@ class Config(object):
             self.map_location = "cpu"
         # weight S/L config
         if self.load_public_weight and not os.path.exists(self.weight_load_path):
-            warn("Can't find weight file in config.weight_load_path: "
-                 + self.weight_load_path) + "\nPretrained weight by PyTorch will be used"
+            warn("Can't find weight file in config.weight_load_path: " + self.weight_load_path)
             self.use_pytorch_weight = True
         else:
             self.use_pytorch_weight = False
         os.makedirs(self.log_root, exist_ok=True)
         assert os.path.isdir(self.log_root)
         self.vis_env_path = os.path.join(self.log_root, 'visdom_{}.json'.format(self.visdom_env))
-        self.temp_weight_path = os.path.join(self.log_root, 'tmpmodel{}.pth'.format(self.start_time))
-        self.temp_optim_path = os.path.join(self.log_root, 'tmp{}{}.pth'.format(self.optimizer, self.start_time))
-        self.log_file = os.path.join(self.log_root, 'logfile{}.txt'.format(self.start_time))
+        self.temp_weight_path = os.path.join(self.log_root, 'tmpmodel{}.pth'.format(self.init_time))
+        self.temp_optim_path = os.path.join(self.log_root, 'tmp{}{}.pth'.format(self.optimizer, self.init_time))
+        self.log_file = os.path.join(self.log_root, 'logfile{}.txt'.format(self.init_time))
         self.train_record_file = os.path.join(self.log_root, 'train_record.jsons.txt')
         """
-       record training process with informations of 
+       record training process by core.make_checkpoint() with corresponding arguments of
        [epoch, start time, elapsed time, loss value, train accuracy, validate accuracy]
        DO NOT CHANGE IT unless you know what you're doing!!!
        """
         self.__record_fields__ = ['epoch', 'start', 'elapsed', 'loss', 'train_acc', 'val_acc']
         if len(self.__record_fields__) == 0:
             warn(
-                '__record_fields__ of {} is empty, this may cause unknown issues when recording training informations into {}'.format(
-                    type(self), self.train_record_file))
+                '{}.__record_fields__ is empty, this may cause unknown issues when save checkpoint into {}' \
+                    .format(type(self), self.train_record_file))
             self.__record_dict__ = '{{}}'
         else:
             self.__record_dict__ = '{{'

@@ -13,9 +13,9 @@ import numpy as np
 from warnings import warn
 from visdom import Visdom, server as VisdomServer
 from time import strftime as timestr
-from model.config import Config
+from core.config import Config
 
-
+#Todo: Save/Load method; about connected
 class Visualizer(object):
     def __init__(self, config: Config):
         logging_level = logging._checkLevel("INFO")

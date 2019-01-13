@@ -11,7 +11,7 @@ from PIL import Image
 from torch.utils import data
 from torchvision import transforms as T
 from torch.utils.data import DataLoader
-from model.config import Config
+from core.config import Config
 
 
 def _isArrayLike(obj):
@@ -76,7 +76,7 @@ def CloudDataLoader(data_type, config):
 if __name__ == "__main__":
     import argparse
     from time import time
-    from model import Config
+    from core import Config
     from cv2 import imshow, waitKey, destroyAllWindows
 
     parse = argparse.ArgumentParser()
