@@ -7,5 +7,6 @@
 
 
 from core.models._base import _BaseModule, get_model, make_checkpoint, resume_checkpoint
-from core.models.ordinalnet import OrdinalNet
-from core.models.cnn import VGG
+from core.models.multinet import MultiNet
+from core.models.vgg import vgg11, vgg11_bn, vgg13, vgg13_bn, vgg16, vgg16_bn, vgg19, vgg19_bn
+from core.models.alexnet import alexnet

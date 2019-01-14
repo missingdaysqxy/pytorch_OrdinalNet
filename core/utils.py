@@ -11,16 +11,17 @@ import logging
 import json
 import numpy as np
 from warnings import warn
-from visdom import Visdom, server as VisdomServer
+from visdom import Visdom
 from time import strftime as timestr
 from core.config import Config
 
-#Todo: Save/Load method; about connected
+
+# Todo: Save/Load method; about connected
 class Visualizer(object):
     def __init__(self, config: Config):
-        logging_level = logging._checkLevel("INFO")
-        logging.getLogger().setLevel(logging_level)
-        VisdomServer.start_server(port=VisdomServer.DEFAULT_PORT, env_path=config.vis_env_path)
+        # logging_level = logging._checkLevel("INFO")
+        # logging.getLogger().setLevel(logging_level)
+        # VisdomServer.start_server(port=VisdomServer.DEFAULT_PORT, env_path=config.vis_env_path)
         self.reinit(config)
 
     def reinit(self, config):
@@ -38,9 +39,9 @@ class Visualizer(object):
                 #     warn(e)
         except ConnectionError as e:
             warn("Can't open Visdom because " + e.strerror)
-        with open(self.config.log_path, 'a') as f:
+        with open(self.config.log_file, 'a') as f:
             info = "[{time}]Initialize Visdom\n".format(time=timestr('%m-%d %H:%M:%S'))
-            info+=str(self.config)
+            info += str(self.config)
             f.write(info + '\n')
 
     def save(self, save_path: str = None) -> str:
@@ -61,18 +62,24 @@ class Visualizer(object):
             pass
         return None
 
-    def plot(self, y, x, name):
-        # type:(int,int,str,Config)->None
-        update = None if x == 0 or not self.visdom.win_exists(name) else 'append'
-        return name == self.visdom.line(np.array([y]), np.array([x]), (name), self.config.visdom_env, dict(title=name),
-                                        update)
+    def plot(self, y, x, line_name, win, legend=None):
+        # type:(float,float,str,str,list(str))->None
+        """Plot a (sequence) of y point(s) (each) with one x value(s), loop this method to draw whole plot"""
+        update = None if not self.visdom.win_exists(win) else 'append'
+        opts = dict()
+        if legend is not None:
+            opts["legend"] = legend
+        return line_name == self.visdom.line(np.array([y]), np.array([x]), win=win, env=self.config.visdom_env,
+                                             update=update, name=line_name, opts=opts)
 
-    def log(self, msg, name, append=True):
-        # type:(str,str,bool,bool)->None
+    def log(self, msg, name, append=True, log_file=None):
+        # type:(str,str,bool,bool,str)->None
+        if log_file is None:
+            log_file = self.config.log_file
         info = "[{time}]{msg}".format(time=timestr('%m-%d %H:%M:%S'), msg=msg)
         append = append and self.visdom.win_exists(name)
-        ret = self.visdom.text(info, win=(name), env=self.config.visdom_env, opts=dict(title=name), append=append)
-        with open(self.config.log_path, 'a') as f:
+        ret = self.visdom.text(info, win=name, env=self.config.visdom_env, opts=dict(title=name), append=append)
+        with open(log_file, 'a') as f:
             f.write(info + '\n')
         return ret == name
 
@@ -81,7 +88,7 @@ class Visualizer(object):
         info = "[{time}]{msg}".format(time=timestr('%m-%d %H:%M:%S'), msg=msg)
         append = append and self.visdom.win_exists(name)
         ret = self.visdom.text(info, win=(name), env=self.config.visdom_env, opts=dict(title=name), append=append)
-        with open(self.config.log_path, 'a') as f:
+        with open(self.config.log_file, 'a') as f:
             f.write(info + '\n')
         self.processBar(num, total, msg)
         return ret == name
@@ -92,7 +99,7 @@ class Visualizer(object):
         clth = int(rate * length)
         if len(msg) > 0:
             msg += ':'
-        msg = msg.replace('\n', '').replace('\r', '')
+        # msg = msg.replace('\n', '').replace('\r', '')
         if rate_num == 100:
             r = '\r%s[%s%d%%]\n' % (msg, '*' * length, rate_num,)
         else:
@@ -100,3 +107,6 @@ class Visualizer(object):
         sys.stdout.write(r)
         sys.stdout.flush
         return r.replace('\r', ':')
+
+    def clear(self):
+        self.visdom.close()

@@ -41,11 +41,11 @@ def get_model(config: Config, **kwargs) -> _BaseModule:
     except AttributeError as e:
         import sys
         raise AttributeError(
-            "No module named '{}' exists in {}".format(config.module, os.path.join(sys.path[0], __file__)))
+            "No module named '{}' exists in core.models".format(config.module))
     from warnings import warn
     # move core to GPU
     if config.use_gpu:
-        model = model.cuda()
+        model = model.cuda(0)
     # initialize weights
     try:
         getattr(model, "initialize_weights")()
@@ -86,6 +86,7 @@ def resume_checkpoint(config: Config, model: Module, optimizer: Optimizer = None
     if os.path.exists(config.temp_weight_path):
         try:
             model.load_state_dict(load(config.temp_weight_path))
+            print("Resumed weight checkpoint from {}".format(config.temp_weight_path))
         except:
             warn("Move invalid temp {} weights file from {} to {}".format(type(model), config.temp_weight_path,
                                                                           config.temp_weight_path + '.badfile'))
@@ -93,6 +94,7 @@ def resume_checkpoint(config: Config, model: Module, optimizer: Optimizer = None
     if optimizer is not None and os.path.exists(config.temp_optim_path):
         try:
             optimizer.load_state_dict(load(config.temp_optim_path))
+            print("Resumed optimizer checkpoint from {}".format(config.temp_optim_path))
         except:
             warn("Move invalid temp {} weights file from {} to {}".format(type(optimizer), config.temp_optim_path,
                                                                           config.temp_optim_path + '.badfile'))
@@ -104,6 +106,7 @@ def resume_checkpoint(config: Config, model: Module, optimizer: Optimizer = None
                 import json
                 info = json.loads(last)
                 last_epoch = int(info["epoch"])
+            print("Continue train from last epoch %d" % last_epoch)
         except:
             warn("Move invalid train record file from {} to {}".format(config.train_record_file,
                                                                        config.train_record_file + '.badfile'))

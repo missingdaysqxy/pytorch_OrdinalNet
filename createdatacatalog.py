@@ -11,18 +11,18 @@ from core import Config
 from collections import defaultdict
 
 
-def create_catalog(datadir, config: Config, save_path=None):
+def create_catalog(datadir, config: Config, save_path=None, print_sample=False, integral_limit=4):
     if save_path is None:
         dir, name = os.path.split(datadir)
         save_path = os.path.join(dir, name + "_catalog.json")
     if os.path.exists(save_path) and not config.reload_data:
-        print("Catalog for {} already exist in {}".format(datadir, save_path))
+        print("Find exist catalog '{}' for '{}'".format(save_path, datadir))
         return save_path
-    save_root = os.path.dirname(save_path)
-    img_paths, parent_ids, labels = step1_getpath(datadir, save_root, config.classes_list)
-    # print(img_paths[0:10])
-    # print(parent_ids[0:10])
-    # print(labels[0:10])
+    img_paths, parent_ids, labels = step1_getpath(datadir, config.classes_list)
+    if print_sample:
+        print(img_paths[0:10])
+        print(parent_ids[0:10])
+        print(labels[0:10])
     print("Found {} sub-images from {}".format(len(img_paths), datadir))
 
     img_dict, intact_stat = step2_findparent(img_paths, parent_ids, labels)
@@ -30,9 +30,12 @@ def create_catalog(datadir, config: Config, save_path=None):
     for k, v in intact_stat:
         print("%d sub-images:    %d scenes" % (k, v))
 
-    scene_list = step3_dict2list(img_dict, intact_limit=8)
-    # print([x["id"] for x in scene_list[0:100]])
-    # print([x["id"] for x in scene_list[-100:]])
+    scene_list = step3_dict2list(img_dict, integral_limit)
+    print("Total scenes : %d in intergraliy limit of %d" % (len(scene_list), integral_limit))
+    if print_sample:
+        print([x["id"] for x in scene_list[0:100]])
+        print([x["id"] for x in scene_list[-100:]])
+        print(scene_list[0:1])
 
     with open(save_path, 'w+') as f:
         json.dump(scene_list, f)
@@ -40,15 +43,15 @@ def create_catalog(datadir, config: Config, save_path=None):
     return save_path
 
 
-def step1_getpath(datadir, save_root, classes_list):
+def step1_getpath(datadir, classes_list):
     img_paths, parent_ids, labels = [], [], []
     for i, annotation in enumerate(classes_list):
         dir = os.path.join(datadir, annotation)
         fs = os.listdir(dir)
-        parent_id = [os.path.basename(f).split('_')[0] for f in fs]
-        fs = [os.path.relpath(os.path.join(dir, item), save_root) for item in fs]
+        parent_id = [int(os.path.basename(f).split('_')[0]) for f in fs]
+        fs = [os.path.abspath(os.path.join(dir, item)) for item in fs]
         img_paths.extend(fs)
-        parent_ids.extend(int(parent_id))
+        parent_ids.extend(parent_id)
         labels.extend([i] * len(fs))
 
     return img_paths, parent_ids, labels
@@ -65,20 +68,19 @@ def step2_findparent(img_paths, parent_ids, labels):
     return img_dict, sorted(intact_stat.items(), key=lambda item: item[0], reverse=True)
 
 
-def step3_dict2list(img_dict, intact_limit):
+def step3_dict2list(img_dict, integral_limit):
     scenelist = []
     scenelist.clear()
     for id, subimg in img_dict.items():
         sublist = []
-        if len(subimg) < intact_limit:
+        if len(subimg) < integral_limit:
             continue
         for subpath, sublabel in subimg.items():
-            idx = int(subpath[subpath.index('_') + 1])
+            basename = os.path.basename(subpath)
+            idx = int(basename[basename.index('_') + 1])
             sublist.append({"index": idx, "label": sublabel, "path": subpath})
         sublist.sort(key=lambda x: x["index"])
         scenelist.append({"id": id, "sublist": sublist})
-    print(scenelist[0:1])
-
     scenelist = sorted(scenelist, key=lambda x: int(x["id"]), reverse=False)
     return scenelist
 

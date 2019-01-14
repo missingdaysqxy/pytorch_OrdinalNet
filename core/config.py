@@ -12,9 +12,9 @@ from time import strftime as timestr
 
 class Config(object):
     # data config
-    train_data_root = r'D:\qixuan\Documents\PythonProjects\clouds_data\mode_2004\train'
-    val_data_root = r'D:\qixuan\Documents\PythonProjects\clouds_data\mode_2004\validation'
-    reload_data = True # update and reload datasets every time
+    train_data_root = r'D:\clouds\datasets\mode_2004\train'
+    val_data_root = r'D:\clouds\datasets\mode_2004\validation'
+    reload_data = True  # update and reload datasets every time
     classes_list = ['A', 'B', 'C', 'D', 'E', 'nodata']
     shuffle_train = True
     shuffle_val = True
@@ -25,9 +25,9 @@ class Config(object):
     use_gpu = True  # if there's no cuda-available GPUs, this will turn to False automatically
     num_data_workers = 4  # how many subprocesses to use for data loading
     pin_memory = True  # only set to True when your machine's memory is large enough
-    time_out = 20  # max seconds for loading a batch of data, 0 means non-limit
+    time_out = 0  # max seconds for loading a batch of data, 0 means non-limit
     max_epoch = 15  # how many epochs for training
-    batch_size = 16  # how many images for a batch
+    batch_size = 2  # how many scene images for a batch
 
     # weight S/L config
     # todo: delete this
@@ -38,8 +38,8 @@ class Config(object):
     debug_flag_file = r'debug'
 
     # module config
-    module = "OrdinalNet"
-    image_resize = [224, 224]
+    module = "MultiNet"
+    image_resize = [224, 224]  # Height * Width
     use_batch_norm = True
     loss_type = "ce"
     optimizer = "adam"
@@ -90,17 +90,13 @@ class Config(object):
         else:
             self.map_location = "cpu"
         # weight S/L config
-        # todo: delete this
-        # if self.load_public_weight and not os.path.exists(self.weight_load_path):
-        #     warn("Can't find weight file in config.weight_load_path: " + self.weight_load_path)
-        #     self.use_pytorch_weight = True
-        # else:
-        #     self.use_pytorch_weight = False
+        self.vis_env_path = os.path.join(self.log_root, 'visdom')
+        os.makedirs(os.path.dirname(self.weight_save_path), exist_ok=True)
         os.makedirs(self.log_root, exist_ok=True)
+        os.makedirs(self.vis_env_path, exist_ok=True)
         assert os.path.isdir(self.log_root)
         self.train_catalog_json = os.path.join(self.log_root, "train_catalog.json")
         self.val_catalog_json = os.path.join(self.log_root, "val_catalog.json")
-        self.vis_env_path = os.path.join(self.log_root, 'visdom_{}.json'.format(self.visdom_env))
         self.temp_weight_path = os.path.join(self.log_root, 'tmpmodel{}.pth'.format(self.init_time))
         self.temp_optim_path = os.path.join(self.log_root, 'tmp{}{}.pth'.format(self.optimizer, self.init_time))
         self.log_file = os.path.join(self.log_root, 'logfile{}.txt'.format(self.init_time))
@@ -122,6 +118,8 @@ class Config(object):
                 self.__record_dict__ += '"{}":"{{}}",'.format(field)
             self.__record_dict__ = self.__record_dict__[:-1] + '}}'
         # module config
+        if isinstance(self.image_resize, int):
+            self.image_resize = [self.image_resize, self.image_resize]
         self.loss_type = self.loss_type.lower()
         assert self.loss_type in ["ordinal", "cross_entropy", "crossentropy", "cross", "ce"]
         self.optimizer = self.optimizer.lower()
