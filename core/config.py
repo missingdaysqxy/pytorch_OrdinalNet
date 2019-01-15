@@ -12,8 +12,8 @@ from time import strftime as timestr
 
 class Config(object):
     # data config
-    train_data_root = r'D:/clouds/datasets/mode_2004/train'
-    val_data_root = r'D:/clouds/datasets/mode_2004/validation'
+    train_data_root = r'./datasets/mode_2004/train'
+    val_data_root = r'./datasets/mode_2004/validation'
     classes_list = ['A', 'B', 'C', 'D', 'E', 'nodata']
     reload_data = False  # update and reload datasets every time
     shuffle_train = True
@@ -23,11 +23,11 @@ class Config(object):
 
     # efficiency config
     use_gpu = True  # if there's no cuda-available GPUs, this will turn to False automatically
-    num_data_workers = 1  # how many subprocesses to use for data loading
-    pin_memory = False  # only set to True when your machine's memory is large enough
+    num_data_workers = 16  # how many subprocesses to use for data loading
+    pin_memory = True  # only set to True when your machine's memory is large enough
     time_out = 0  # max seconds for loading a batch of data, 0 means non-limit
-    max_epoch = 50  # how many epochs for training
-    batch_size = 2  # how many scene images for a batch
+    max_epoch = 100  # how many epochs for training
+    batch_size = 64  # how many scene images for a batch
 
     # weight S/L config
     weight_load_path = r'checkpoints/multinet.pth'  # where to load pre-trained weight for further training
@@ -48,7 +48,7 @@ class Config(object):
 
     # visualize config
     visdom_env = 'main'
-    ckpt_freq = 1  # save checkpoint after these iterations
+    ckpt_freq = 10  # save checkpoint after these iterations
 
     def __init__(self, mode: str, **kwargs):
         if mode not in ['train', 'inference']:
@@ -99,7 +99,7 @@ class Config(object):
         self.temp_optim_path = os.path.join(self.log_root, 'tmp{}{}.pth'.format(self.optimizer, self.init_time))
         self.log_file = os.path.join(self.log_root, '{}.{}.log'.format(self.mode, self.init_time))
         self.val_result = os.path.join(self.log_root, 'validation_result{}.txt'.format(self.init_time))
-        self.train_record_file = os.path.join(self.log_root, 'train.record.jsons.txt')
+        self.train_record_file = os.path.join(self.log_root, 'train.record.jsons')
         """
        record training process by core.make_checkpoint() with corresponding arguments of
        [epoch, start time, elapsed time, loss value, train accuracy, validate accuracy]
