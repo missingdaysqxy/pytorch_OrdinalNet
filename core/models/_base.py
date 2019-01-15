@@ -50,7 +50,7 @@ def get_model(config: Config, **kwargs) -> _BaseModule:
     try:
         getattr(model, "initialize_weights")()
     except AttributeError as e:
-        warn("try to initialize weights failed because:\n" + str(e))
+        warn("initialize weights failed because:\n" + str(e))
     # parallel processing
     model = DataParallel(model, config.gpu_list)
     # load weights

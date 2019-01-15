@@ -65,6 +65,9 @@ def train(model, train_data, val_data, config, vis):
     assert last_epoch + 1 < config.max_epoch, \
         "previous training has reached epoch {}, please increase the max_epoch in {}". \
             format(last_epoch + 1, type(config))
+    if last_epoch == -1:  # start a new train proc
+        vis.save(config.vis_env_path + 'last')
+        vis.clear()
     # init meter statistics
     loss_meter = meter.AverageValueMeter()
     loss1_meter = meter.AverageValueMeter()
@@ -109,9 +112,9 @@ def train(model, train_data, val_data, config, vis):
             optimizer.step()
             # statistic
             loss_meter.add(loss.data.cpu())
-            loss1_meter.add(loss1.cpu())
-            loss2_meter.add(loss2.cpu())
-            loss3_meter.add(loss3.cpu())
+            loss1_meter.add(loss1.data.cpu())
+            loss2_meter.add(loss2.data.cpu())
+            loss3_meter.add(loss3.data.cpu())
             batch_final_pred = t.argmax(batch_final_prob, dim=-1)
             confusion_matrix.add(batch_final_pred, batch_sub_label)
             # print process
@@ -164,7 +167,6 @@ def main(*args, **kwargs):
     val_data = get_data("val", config)
     model = get_model(config)
     vis = Visualizer(config)
-    vis.clear()
     print("Prepare to train model...")
     train(model, train_data, val_data, config, vis)
     # save core

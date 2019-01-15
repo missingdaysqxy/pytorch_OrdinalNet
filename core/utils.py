@@ -10,13 +10,15 @@ import sys
 import logging
 import json
 import numpy as np
+import torch as t
 from warnings import warn
 from visdom import Visdom
 from time import strftime as timestr
 from core.config import Config
 
 
-# Todo: Save/Load method; about connected to server
+# Todo: Save/Load method: download env from server to local for transmit, and upload local env to server for share
+# Todo: Start server through local code
 class Visualizer(object):
     def __init__(self, config: Config):
         # logging_level = logging._checkLevel("INFO")
@@ -45,7 +47,7 @@ class Visualizer(object):
             f.write(info + '\n')
 
     def save(self, save_path: str = None) -> str:
-        retstr = self.visdom.save([self.config.visdom_env])
+        retstr = self.visdom.save([self.config.visdom_env])  # return current environments name in format of json
         try:
             ret = json.loads(retstr)[0]
             if ret == self.config.visdom_env:
@@ -62,6 +64,21 @@ class Visualizer(object):
             pass
         return None
 
+    def clear(self):
+        self.visdom.close()
+
+    @staticmethod
+    def _to_numpy(value):
+        if isinstance(value, t.Tensor):
+            value = value.cpu().detach().numpy()
+        elif isinstance(value, np.ndarray):
+            pass
+        else:
+            value = np.array(value)
+        if value.ndim == 0:
+            value = value[np.newaxis]
+        return value
+
     def plot(self, y, x, line_name, win, legend=None):
         # type:(float,float,str,str,list(str))->None
         """Plot a (sequence) of y point(s) (each) with one x value(s), loop this method to draw whole plot"""
@@ -69,12 +86,15 @@ class Visualizer(object):
         opts = dict(title=win)
         if legend is not None:
             opts["legend"] = legend
-        return win == self.visdom.line(np.array([y]), np.array([x]), win=win, env=self.config.visdom_env,
+        y = Visualizer._to_numpy(y)
+        x = Visualizer._to_numpy(x)
+        return win == self.visdom.line(y, x, win=win, env=self.config.visdom_env,
                                        update=update, name=line_name, opts=opts)
 
     def bar(self, y, win, rowindices=None):
         opts = dict(title=win)
-        if isinstance(rowindices, list) and len(rowindices)==len(y):
+        y = Visualizer._to_numpy(y)
+        if isinstance(rowindices, list) and len(rowindices) == len(y):
             opts["rownames"] = rowindices
         return win == self.visdom.bar(y, win=win, env=self.config.visdom_env, opts=opts)
 
@@ -114,6 +134,3 @@ class Visualizer(object):
         sys.stdout.write(r)
         sys.stdout.flush
         return r.replace('\r', ':')
-
-    def clear(self):
-        self.visdom.close()

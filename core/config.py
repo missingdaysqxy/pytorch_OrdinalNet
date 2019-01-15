@@ -12,8 +12,8 @@ from time import strftime as timestr
 
 class Config(object):
     # data config
-    train_data_root = r'./datasets/mode_2004/train'
-    val_data_root = r'./datasets/mode_2004/validation'
+    train_data_root = r'D:/clouds/datasets/mode_2004/train'
+    val_data_root = r'D:/clouds/datasets/mode_2004/validation'
     classes_list = ['A', 'B', 'C', 'D', 'E', 'nodata']
     reload_data = False  # update and reload datasets every time
     shuffle_train = True
@@ -23,11 +23,11 @@ class Config(object):
 
     # efficiency config
     use_gpu = True  # if there's no cuda-available GPUs, this will turn to False automatically
-    num_data_workers = 16  # how many subprocesses to use for data loading
+    num_data_workers = 1  # how many subprocesses to use for data loading
     pin_memory = True  # only set to True when your machine's memory is large enough
     time_out = 0  # max seconds for loading a batch of data, 0 means non-limit
     max_epoch = 100  # how many epochs for training
-    batch_size = 64  # how many scene images for a batch
+    batch_size = 1  # how many scene images for a batch
 
     # weight S/L config
     weight_load_path = r'checkpoints/multinet.pth'  # where to load pre-trained weight for further training
@@ -39,7 +39,7 @@ class Config(object):
     module = "MultiNet"
     image_resize = [224, 224]  # Height * Width
     use_batch_norm = True
-    loss_type = "ordinal"
+    loss_type = "ce"
     optimizer = "adam"
     lr = 0.01  # learning rate
     lr_decay = 0.95
@@ -48,7 +48,7 @@ class Config(object):
 
     # visualize config
     visdom_env = 'main'
-    ckpt_freq = 10  # save checkpoint after these iterations
+    ckpt_freq = 1  # save checkpoint after these iterations
 
     def __init__(self, mode: str, **kwargs):
         if mode not in ['train', 'inference']:
