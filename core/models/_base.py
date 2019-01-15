@@ -56,10 +56,12 @@ def get_model(config: Config, **kwargs) -> _BaseModule:
     # load weights
     if os.path.exists(config.weight_load_path):
         try:
-            model.load_state_dict(load(config.weight_load_path, map_location=config.map_location))
+            state_dict = load(config.weight_load_path, map_location=config.map_location)
+            model.load_state_dict(state_dict)
             print('Loaded weights from ' + config.weight_load_path)
         except RuntimeError as e:
-            warn('Failed to load weights file {} because:\n{}'.format(config.weight_load_path, e))
+            warn("Failed to load weights file")
+            print('Failed to load weights file {} because:\n{}'.format(config.weight_load_path, e))
     return model
 
 

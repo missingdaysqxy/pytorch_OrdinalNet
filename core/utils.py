@@ -16,7 +16,7 @@ from time import strftime as timestr
 from core.config import Config
 
 
-# Todo: Save/Load method; about connected
+# Todo: Save/Load method; about connected to server
 class Visualizer(object):
     def __init__(self, config: Config):
         # logging_level = logging._checkLevel("INFO")
@@ -66,11 +66,17 @@ class Visualizer(object):
         # type:(float,float,str,str,list(str))->None
         """Plot a (sequence) of y point(s) (each) with one x value(s), loop this method to draw whole plot"""
         update = None if not self.visdom.win_exists(win) else 'append'
-        opts = dict()
+        opts = dict(title=win)
         if legend is not None:
             opts["legend"] = legend
-        return line_name == self.visdom.line(np.array([y]), np.array([x]), win=win, env=self.config.visdom_env,
-                                             update=update, name=line_name, opts=opts)
+        return win == self.visdom.line(np.array([y]), np.array([x]), win=win, env=self.config.visdom_env,
+                                       update=update, name=line_name, opts=opts)
+
+    def bar(self, y, win, rowindices=None):
+        opts = dict(title=win)
+        if isinstance(rowindices, list) and len(rowindices)==len(y):
+            opts["rownames"] = rowindices
+        return win == self.visdom.bar(y, win=win, env=self.config.visdom_env, opts=opts)
 
     def log(self, msg, name, append=True, log_file=None):
         # type:(str,str,bool,bool,str)->None
@@ -79,7 +85,8 @@ class Visualizer(object):
         info = "[{time}]{msg}".format(time=timestr('%m-%d %H:%M:%S'), msg=msg)
         append = append and self.visdom.win_exists(name)
         ret = self.visdom.text(info, win=name, env=self.config.visdom_env, opts=dict(title=name), append=append)
-        with open(log_file, 'a') as f:
+        mode = 'a+' if append else 'w+'
+        with open(log_file, mode) as f:
             f.write(info + '\n')
         return ret == name
 

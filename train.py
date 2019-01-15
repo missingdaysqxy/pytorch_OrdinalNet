@@ -10,6 +10,7 @@ import time
 import numpy as np
 import torch as t
 from warnings import warn
+from collections import defaultdict
 from torch.nn import Module
 from torchnet import meter
 from core import *
@@ -37,23 +38,23 @@ def get_optimizer(model: Module, config: Config) -> t.optim.Optimizer:
     if config.optimizer == "sgd":
         return t.optim.SGD(model.parameters(), config.lr, config.momentum, weight_decay=config.weight_decay)
     elif config.optimizer == "adam":
-        return t.optim.Adam(model.parameters())
+        return t.optim.Adam(model.parameters(), lr=config.lr, weight_decay=config.weight_decay)
     else:
         raise RuntimeError("Invalid value: config.optimizer")
 
 
 def train(model, train_data, val_data, config, vis):
     # type: (Module,CloudDataLoader,CloudDataLoader,Config,Visualizer)->None
-    def loss_sum(loss1, loss2, loss3):
-        loss1 *= LOSS_WEIGHT[0]
-        loss2 *= LOSS_WEIGHT[1]
-        loss3 *= LOSS_WEIGHT[2]
-        sum = loss1 + loss2 + loss3
-        L1 = loss1 * (loss2 + loss3) / sum
-        L2 = loss2 * (loss1 + loss3) / sum
-        L3 = loss3 * (loss1 + loss2) / sum
-        Loss = L1 + L2 + L3
-        return Loss, L1, L2, L3
+    def loss_sum(c1, c2, c3):
+        c1 *= LOSS_WEIGHT[0]
+        c2 *= LOSS_WEIGHT[1]
+        c3 *= LOSS_WEIGHT[2]
+        sum = c1 + c2 + c3
+        loss1 = c1 * (c2 + c3) / sum
+        loss2 = c2 * (c1 + c3) / sum
+        loss3 = c3 * (c1 + c2) / sum
+        loss = loss1 + loss2 + loss3
+        return loss, loss1, loss2, loss3
 
     # init loss and optim
     criterion1, criterion2, criterion3 = get_loss_functions(config)
@@ -62,14 +63,15 @@ def train(model, train_data, val_data, config, vis):
     # try to resume
     last_epoch = resume_checkpoint(config, model, optimizer)
     assert last_epoch + 1 < config.max_epoch, \
-        "previous training has reached epoch {}, please increase the max_epoch in {}".format(last_epoch + 1,
-                                                                                             type(config))
+        "previous training has reached epoch {}, please increase the max_epoch in {}". \
+            format(last_epoch + 1, type(config))
     # init meter statistics
     loss_meter = meter.AverageValueMeter()
     loss1_meter = meter.AverageValueMeter()
     loss2_meter = meter.AverageValueMeter()
     loss3_meter = meter.AverageValueMeter()
     confusion_matrix = meter.ConfusionMeter(config.num_classes)
+    last_accuracy = 0
     for epoch in range(last_epoch + 1, config.max_epoch):
         epoch_start = time.time()
         loss_mean = None
@@ -96,20 +98,20 @@ def train(model, train_data, val_data, config, vis):
             batch_pare_label.requires_grad_(False)
             batch_sub_label = batch_sub_label.view(-1)
             # forward
-            batch_inter_prob, batch_cover_rate, batch_final_prob = model(batch_sub_img, batch_parent_img)
-            loss1 = criterion1(batch_inter_prob, batch_sub_label)
-            loss2 = criterion2(batch_cover_rate, batch_pare_label)
-            loss3 = criterion3(batch_final_prob, batch_sub_label)
-            loss, loss1, loss2, loss3 = loss_sum(loss1, loss2, loss3)
+            batch_interim_prob, batch_cover_rate, batch_final_prob = model(batch_sub_img, batch_parent_img)
+            c1 = criterion1(batch_interim_prob, batch_sub_label)
+            c2 = criterion2(batch_cover_rate, batch_pare_label)
+            c3 = criterion3(batch_final_prob, batch_sub_label)
+            loss, loss1, loss2, loss3 = loss_sum(c1, c2, c3)
             # backward
             optimizer.zero_grad()
             loss.backward()
             optimizer.step()
             # statistic
             loss_meter.add(loss.data.cpu())
-            loss1_meter.add(loss1.data.cpu())
-            loss2_meter.add(loss2.data.cpu())
-            loss3_meter.add(loss3.data.cpu())
+            loss1_meter.add(loss1.cpu())
+            loss2_meter.add(loss2.cpu())
+            loss3_meter.add(loss3.cpu())
             batch_final_pred = t.argmax(batch_final_prob, dim=-1)
             confusion_matrix.add(batch_final_pred, batch_sub_label)
             # print process
@@ -137,14 +139,26 @@ def train(model, train_data, val_data, config, vis):
                 if os.path.exists(config.debug_flag_file):
                     ipdb.set_trace()
         # validate after each epoch
-        inter_acc, inter_cm, val_acc, val_cm, num_dis = val(model, val_data, config, vis)
-        vis.plot(val_acc, epoch, 'Validation Accuracy')
+        pare_acc, pare_cm, sub_acc, sub_cm, corr_label, err_level = val(model, val_data, config, vis)
+        vis.plot(pare_acc, epoch, 'pare_acc', 'Parent-Images Validation Accuracy', ['pare_acc'])
+        vis.plot(sub_acc, epoch, 'sub_acc', 'Sub-Images Validation Accuracy', ['sub_acc'])
         # save checkpoint
-        make_checkpoint(config, epoch, epoch_start, loss_mean, train_acc, val_acc, model, optimizer)
+        if pare_acc > last_accuracy:
+            msg += 'best validation result after epoch {}, loss:{}, train_acc: {}'.format(epoch, loss_mean, train_acc)
+            msg += 'parent-image validation accuracy:{}\n'.format(pare_acc)
+            msg += 'sub-image validation accuracy:{}\n'.format(sub_acc)
+            msg += 'validation scene confusion matrix:\n{}\n'.format(pare_cm)
+            msg += 'validation sub confusion matrix:\n{}\n'.format(sub_cm)
+            msg += 'number of correct labels in a scene:\n{}\n'.format(corr_label)
+            msg += 'number of error levels in a scene:\n{}\n'.format(err_level)
+            vis.log(msg, 'best_val_result', log_file=config.val_result, append=False)
+            print("save best validation result into " + config.val_result)
+        last_accuracy = pare_acc
+        make_checkpoint(config, epoch, epoch_start, loss_mean, train_acc, sub_acc, model, optimizer)
 
 
-def main(args):
-    config = Config('train')
+def main(*args, **kwargs):
+    config = Config('train', **kwargs)
     print(config)
     train_data = get_data("train", config)
     val_data = get_data("val", config)

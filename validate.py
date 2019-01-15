@@ -6,13 +6,14 @@
 # @Software: PyCharm
 
 import os
+import math
 import warnings
 import numpy as np
 import torch as t
 from torch.nn import Module
 from torchnet import meter
 from collections import defaultdict
-from core import Config, get_model, OrdinalLoss, Visualizer, ipdb
+from core import Config, get_model, Visualizer, ipdb
 from datasets import CloudDataLoader
 
 
@@ -21,31 +22,33 @@ def get_data(data_type, config: Config):
     return data
 
 
-def get_loss_function(config: Config) -> Module:
-    if config.loss_type == "ordinal":
-        return OrdinalLoss()
-    elif config.loss_type in ["cross_entropy", "crossentropy", "cross", "ce"]:
-        return t.nn.CrossEntropyLoss()
-    else:
-        raise RuntimeError("Invalid config.loss_type:" + config.loss_type)
+def cover_rate2class(cover_rate: t.Tensor):
+    cover_rate /= 8
+    down_threshold = [-100000, 0.05, 0.1, 0.25, 0.75]
+    up_threshold = [0.05, 0.1, 0.25, 0.75, 100000]
+    ret = t.full([cover_rate.numel()], len(up_threshold))
+    for i in range(len(up_threshold)):
+        index = t.nonzero(cover_rate.gt(down_threshold[i]) * cover_rate.lt(up_threshold[i])).squeeze().cpu()
+        ret.index_fill_(0, index, i)
+    return ret
 
 
-def get_optimizer(model: Module, config: Config) -> t.optim.Optimizer:
-    if config.optimizer == "sgd":
-        return t.optim.SGD(model.parameters(), config.lr, config.momentum, weight_decay=config.weight_decay)
-    elif config.optimizer == "adam":
-        return t.optim.Adam(model.parameters())
-    else:
-        raise RuntimeError("Invalid value: config.optimizer")
+def error_levels_distribution(confusion_matrix_value):
+    # type:(list(list(int)))->defaultdict(int)
+    error_level_distrib = defaultdict(int)
+    for i in range(len(confusion_matrix_value)):
+        for j in range(len(confusion_matrix_value[i])):
+            error = int(np.abs(i - j))
+            error_level_distrib[error] += int(confusion_matrix_value[i, j])
+    return dict(error_level_distrib)
 
 
 def validate(model, val_data, config, vis):
     # type: (Module,CloudDataLoader,Config,Visualizer)->None
-    # move core to GPU
     with t.no_grad():
-        num_correct_distribute = defaultdict(int)  # show how many sub-images are correct for all parent-images
-        inter_confusion_matrix = meter.ConfusionMeter(config.num_classes)
-        final_confusion_matrix = meter.ConfusionMeter(config.num_classes)
+        correct_label_distrib = defaultdict(int)  # show how many sub-images are correct for all parent-images
+        sub_confusion_matrix = meter.ConfusionMeter(config.num_classes)
+        pare_confusion_matrix = meter.ConfusionMeter(config.num_classes)
         # validate
         for i, input in enumerate(val_data):
             model.eval()
@@ -59,32 +62,42 @@ def validate(model, val_data, config, vis):
                     batch_pare_label = batch_pare_label.cuda()
             batch_sub_label = batch_sub_label.view(-1)
             # forward
-            batch_inter_prob, batch_cover_rate, batch_final_prob = model(batch_sub_img, batch_parent_img)
+            _, batch_cover_rate, batch_prob = model(batch_sub_img, batch_parent_img)
             batch_cover_rate.squeeze_()
             # confusion matrix statistic
-            batch_inter_pred = t.argmax(batch_inter_prob, dim=-1)
-            batch_final_pred = t.argmax(batch_final_prob, dim=-1)
-            inter_confusion_matrix.add(batch_inter_pred, batch_sub_label)
-            final_confusion_matrix.add(batch_final_pred, batch_sub_label)
+            batch_pred = t.argmax(batch_prob, dim=-1)
+            sub_confusion_matrix.add(batch_pred, batch_sub_label)
+            pare_confusion_matrix.add(cover_rate2class(batch_cover_rate), cover_rate2class(batch_pare_label))
             # distribution statistic
-            compares = (batch_final_pred == batch_sub_label)
+            compares = (batch_pred == batch_sub_label)
             compares = t.split(compares, 8)
             for cps in compares:
                 sub_corr_count = cps.sum().cpu().numpy()
-                num_correct_distribute[int(sub_corr_count)] += 1
+                correct_label_distrib[int(sub_corr_count)] += 1
+            for i in range(9):
+                correct_label_distrib[i] += 0
+            correct_label_distrib = dict(sorted(correct_label_distrib.items(), key=lambda x: x[0], reverse=False))
             regr_dist = t.mean(t.abs(batch_cover_rate - batch_pare_label)).cpu().numpy()
             # print process
             if i % config.ckpt_freq == 0 or i >= len(val_data) - 1:
-                msg = "[Validation]process:{}/{},scene regression regr_dist:{},inter confusion matrix:\n{}\nconfusion matrix:\n{}".format(
-                    i, len(val_data) - 1, regr_dist, inter_confusion_matrix.value(), final_confusion_matrix.value())
+                cm_value = pare_confusion_matrix.value()
+                error_level_distrib = error_levels_distribution(cm_value)
+                msg = "[Validation]process:{}/{},scene regression distance:{}\n".format(i, len(val_data) - 1, regr_dist)
+                msg += "confusion matrix:\n{}\ncorrect labels distribution:\n{}\nerror levels distribution:\n{}\n".format(
+                    cm_value, correct_label_distrib, error_level_distrib)
                 vis.log_process(i, len(val_data) - 1, msg, 'val_log', append=True)
-            # del batch_img, batch_label, batch_scene, batch_probs, batch_final_pred, compares
-            # t.cuda.empty_cache()
-        inter_cm = inter_confusion_matrix.value()
-        final_cm = final_confusion_matrix.value()
-        inter_accuracy = inter_cm.trace().astype(np.float) / inter_cm.sum()
-        final_accuracy = final_cm.trace().astype(np.float) / final_cm.sum()
-    return inter_accuracy, inter_confusion_matrix.value(), final_accuracy, final_confusion_matrix.value(), num_correct_distribute
+
+                vis.bar(list(correct_label_distrib.values()), 'number of correct labels',
+                        list(correct_label_distrib.keys()))
+                vis.bar(list(error_level_distrib.values()), 'number of error levels', list(error_level_distrib.keys()))
+
+        pare_cm = pare_confusion_matrix.value()
+        sub_cm = sub_confusion_matrix.value()
+        pare_acc = pare_cm.trace().astype(np.float) / pare_cm.sum()
+        sub_acc = sub_cm.trace().astype(np.float) / sub_cm.sum()
+        error_level_distrib = error_levels_distribution(pare_cm)
+
+    return pare_acc, pare_cm, sub_acc, sub_cm, correct_label_distrib, error_level_distrib
 
 
 def main(args):
@@ -94,12 +107,17 @@ def main(args):
     model = get_model(config)
     vis = Visualizer(config)
     print("Prepare to validate model...")
-    inter_acc, inter_cm, val_acc, val_cm, num_dis = validate(model, val_data, config, vis)
-    msg = 'interm accuracy:{}, validation accuracy:{}\n'.format(inter_acc, val_acc)
-    msg += 'interm confusion matrix:\n{}\nvalidation confusion matrix:\n{}\n'.format(inter_cm, val_cm)
-    msg += 'number of correct labels in a scene:\n{}'.format(num_dis)
+
+    pare_acc, pare_cm, sub_acc, sub_cm, corr_label, err_level = validate(model, val_data, config, vis)
+    msg = 'parent-image validation accuracy:{}\n'.format(pare_acc)
+    msg += 'sub-image validation accuracy:{}\n'.format(sub_acc)
+    msg += 'validation scene confusion matrix:\n{}\n'.format(pare_cm)
+    msg += 'validation sub confusion matrix:\n{}\n'.format(sub_cm)
+    msg += 'number of correct labels in a scene:\n{}\n'.format(corr_label)
+    msg += 'number of error levels in a scene:\n{}\n'.format(err_level)
     print("Validation Finish!", msg)
-    vis.log(msg, 'val_result', log_file='val_result.txt')
+    vis.log(msg, 'val_result', log_file=config.val_result)
+    print("save best validation result into " + config.val_result)
 
 
 if __name__ == '__main__':

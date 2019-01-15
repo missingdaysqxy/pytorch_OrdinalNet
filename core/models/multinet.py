@@ -32,19 +32,19 @@ class MultiNet(_base._BaseModule):
     def forward(self, tensor_s, tensor_p):
         tensor_s = tensor_s.view(self.input_shape)
         mini_batch = tensor_s.size(0)
-        inter_features, inter_probs = self.vgg_c(tensor_s)
+        sub_features, interim_probs = self.vgg_c(tensor_s)
         pare_features, para_logits = self.vgg_r(tensor_p)
         cover_rate = F.dropout(self.regression(para_logits))
-        inter_features = t.split(inter_features, 8, dim=0)
+        sub_features = t.split(sub_features, 8, dim=0)
         pare_features = t.split(pare_features, 1, dim=0)
         features = []
-        for sub, pare in zip(inter_features, pare_features):
+        for sub, pare in zip(sub_features, pare_features):
             pare = pare.expand(8, -1, -1, -1)
             features.append(t.cat((sub, pare), dim=1))
         features = t.cat(features).view(mini_batch, 1, 224, 224)  # shape: [mini_batch, 1, 224,224]
         features = features.expand(-1, 3, -1, -1)
         final_probs = self.resnet(features)
-        return inter_probs, cover_rate, final_probs
+        return interim_probs, cover_rate, final_probs
 
     def initialize_weights(self):
         for m in self.modules():
