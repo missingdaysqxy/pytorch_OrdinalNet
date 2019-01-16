@@ -34,7 +34,7 @@ class MultiNet(_base._BaseModule):
         mini_batch = tensor_s.size(0)
         sub_features, interim_probs = self.vgg_c(tensor_s)
         pare_features, para_logits = self.vgg_r(tensor_p)
-        cover_rate = F.dropout(self.regression(para_logits))
+        cover_rate = self.regression(F.dropout(F.relu(para_logits)))
         sub_features = t.split(sub_features, 8, dim=0)
         pare_features = t.split(pare_features, 1, dim=0)
         features = []

@@ -11,12 +11,11 @@ import numpy as np
 import torch as t
 from torch.nn import Module
 from collections import defaultdict
-from core import Config, get_model, OrdinalLoss, Visualizer, ipdb
+from core import Config, get_model, Visualizer, ipdb
 from PIL import Image
 from torch.utils import data
 from torchvision import transforms as T
 from torchvision.transforms import functional as Tfn
-from core.config import Config
 
 
 def evaluate(model, img_path, config):
