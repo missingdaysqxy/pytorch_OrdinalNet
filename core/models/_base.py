@@ -7,11 +7,12 @@
 
 import os
 import time
+import torch as t
 from torch import save, load, set_grad_enabled
 from warnings import warn
 from torch.nn import Module, DataParallel
 from torch.optim import Optimizer
-from core.config import Config
+from .config import Config
 
 
 class _BaseModule(Module):
@@ -34,14 +35,13 @@ def get_model(config: Config, **kwargs) -> _BaseModule:
     :return: an instance of the Module specified by config.module
     """
     assert isinstance(config, Config)
-    from core import models
+    from . import models
     try:
         with set_grad_enabled(config.enable_grad):
             model = getattr(models, config.module)(config, **kwargs)
     except AttributeError as e:
-        import sys
         raise AttributeError(
-            "No module named '{}' exists in core.models".format(config.module))
+            "No module named '{}' exists in core.models, error message: {}".format(config.module, e))
     from warnings import warn
     # move core to GPU
     if config.use_gpu:
@@ -65,8 +65,8 @@ def get_model(config: Config, **kwargs) -> _BaseModule:
     return model
 
 
-def make_checkpoint(config, epoch, start_time, loss_val, train_acc, val_acc, model, optimizer=None):
-    # type:(Config,int,str,str,float,float,float,Module,Optimizer)->None
+def make_checkpoint(config, epoch, start_time, loss_val, train_score, val_score, model, optimizer=None):
+    # type:(Config,int,float,float,float,float,Module,Optimizer)->None
     """
     generate temporary training process data for resuming by resume_checkpoint()
     """
@@ -75,7 +75,8 @@ def make_checkpoint(config, epoch, start_time, loss_val, train_acc, val_acc, mod
         save(optimizer.state_dict(), config.temp_optim_path)
     with open(config.train_record_file, 'a+') as f:
         elapsed_time = time.time() - start_time,
-        record = config.__record_dict__.format(epoch, start_time, elapsed_time, loss_val, train_acc, val_acc)
+        record = config.__record_dict__.format(config.init_time, epoch, start_time, elapsed_time, loss_val, train_score,
+                                               val_score)
         f.write(record + '\n')
 
 
@@ -85,22 +86,8 @@ def resume_checkpoint(config: Config, model: Module, optimizer: Optimizer = None
     :return number of last epoch
     """
     last_epoch = -1
-    if os.path.exists(config.temp_weight_path):
-        try:
-            model.load_state_dict(load(config.temp_weight_path))
-            print("Resumed weight checkpoint from {}".format(config.temp_weight_path))
-        except:
-            warn("Move invalid temp {} weights file from {} to {}".format(type(model), config.temp_weight_path,
-                                                                          config.temp_weight_path + '.badfile'))
-            os.rename(config.temp_weight_path, config.temp_weight_path + '.badfile')
-    if optimizer is not None and os.path.exists(config.temp_optim_path):
-        try:
-            optimizer.load_state_dict(load(config.temp_optim_path))
-            print("Resumed optimizer checkpoint from {}".format(config.temp_optim_path))
-        except:
-            warn("Move invalid temp {} weights file from {} to {}".format(type(optimizer), config.temp_optim_path,
-                                                                          config.temp_optim_path + '.badfile'))
-            os.rename(config.temp_optim_path, config.temp_optim_path + '.badfile')
+    temp_weight_path = config.temp_weight_path
+    temp_optim_path = config.temp_optim_path
     if os.path.exists(config.train_record_file):
         try:
             with open(config.train_record_file, 'r') as f:
@@ -108,14 +95,32 @@ def resume_checkpoint(config: Config, model: Module, optimizer: Optimizer = None
                 import json
                 info = json.loads(last)
                 last_epoch = int(info["epoch"])
+                last_init = str(info["init"])
+                if not os.path.exists(temp_weight_path):
+                    temp_weight_path = temp_weight_path.replace(config.init_time, last_init)
+                if not os.path.exists(temp_optim_path):
+                    temp_optim_path = temp_optim_path.replace(config.init_time, last_init)
             print("Continue train from last epoch %d" % last_epoch)
         except:
-            warn("Move invalid train record file from {} to {}".format(config.train_record_file,
-                                                                       config.train_record_file + '.badfile'))
+            warn("Rename invalid train record file from {} to {}".format(config.train_record_file,
+                                                                         config.train_record_file + '.badfile'))
             warn("Can't get last_epoch value, {} will be returned".format(last_epoch))
             os.rename(config.train_record_file, config.train_record_file + '.badfile')
+    if os.path.exists(temp_weight_path):
+        try:
+            model.load_state_dict(load(temp_weight_path))
+            print("Resumed weight checkpoint from {}".format(temp_weight_path))
+        except:
+            warn("Move invalid temp {} weights file from {} to {}".format(type(model), temp_weight_path,
+                                                                          temp_weight_path + '.badfile'))
+            os.rename(temp_weight_path, temp_weight_path + '.badfile')
+    if optimizer is not None and os.path.exists(temp_optim_path):
+        try:
+            optimizer.load_state_dict(load(temp_optim_path))
+            print("Resumed optimizer checkpoint from {}".format(temp_optim_path))
+        except:
+            warn("Move invalid temp {} weights file from {} to {}".format(type(optimizer), temp_optim_path,
+                                                                          temp_optim_path + '.badfile'))
+            os.rename(temp_optim_path, temp_optim_path + '.badfile')
+
     return last_epoch
-
-
-if __name__ == "__main__":
-    pass

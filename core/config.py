@@ -105,7 +105,7 @@ class Config(object):
        [epoch, start time, elapsed time, loss value, train accuracy, validate accuracy]
        DO NOT CHANGE IT unless you know what you're doing!!!
        """
-        self.__record_fields__ = ['epoch', 'start', 'elapsed', 'loss', 'train_acc', 'val_acc']
+        self.__record_fields__ = ['epoch', 'start', 'elapsed', 'loss', 'train_score', 'val_score']
         if len(self.__record_fields__) == 0:
             warn(
                 '{}.__record_fields__ is empty, this may cause unknown issues when save checkpoint into {}' \
