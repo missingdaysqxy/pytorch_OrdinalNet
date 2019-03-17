@@ -5,15 +5,14 @@
 # @File    : multinet.py
 # @Software: PyCharm
 
-import os
 import math
 import torch as t
-from warnings import warn
 from torch import nn
 from torchvision.models import resnet
 from torch.nn import functional as F
-from core.config import Config
-from core.models import _base, vgg, alexnet
+from ..config import Config
+from ..models import vgg
+import _base
 
 
 class MultiNet(_base._BaseModule):

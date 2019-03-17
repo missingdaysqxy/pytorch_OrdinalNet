@@ -5,10 +5,11 @@
 # @File    : __init__.py
 # @Software: PyCharm
 
-from core.models import *
+from .models import *
 from .config import Config
 from .utils import Visualizer
 from .ordinalloss import OrdinalLoss
+from ._base import _BaseModule, get_model, make_checkpoint, resume_checkpoint
 
 try:
     import ipdb

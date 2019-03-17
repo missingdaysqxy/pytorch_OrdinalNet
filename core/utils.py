@@ -14,7 +14,7 @@ import torch as t
 from warnings import warn
 from visdom import Visdom
 from time import strftime as timestr
-from core.config import Config
+from .config import Config
 
 
 # Todo: Save/Load method: download env from server to local for transmit, and upload local env to server for share
