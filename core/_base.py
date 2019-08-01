@@ -12,7 +12,7 @@ from torch import save, load, set_grad_enabled
 from warnings import warn
 from torch.nn import Module, DataParallel
 from torch.optim import Optimizer
-from .config import Config
+from core.config import Config
 
 
 class _BaseModule(Module):

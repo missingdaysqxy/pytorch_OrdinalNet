@@ -182,6 +182,12 @@ def main(*args, **kwargs):
 
 
 if __name__ == '__main__':
+    # config = Config('train')
+    #
+    # model = get_model(config)
+    #
+    # print(model)
+
     import argparse
 
     parse = argparse.ArgumentParser()
